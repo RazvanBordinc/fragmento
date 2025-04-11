@@ -113,7 +113,7 @@ export default function Navbar() {
 
           {/* Profile Button (Desktop) */}
           <div className="hidden md:block ml-1">
-            <Link href="/profile">
+            <Link href="/app/profile">
               <motion.button
                 className="flex items-center justify-center text-zinc-400 hover:text-white p-2 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-700 transition duration-200"
                 whileHover={{ scale: 1.05 }}
@@ -175,7 +175,7 @@ export default function Navbar() {
               <ul className="flex flex-col p-4 mt-4 border border-zinc-700 rounded-lg bg-zinc-800">
                 <li>
                   <Link
-                    href="/feed"
+                    href="/app"
                     className="flex items-center py-2 px-3 text-white bg-orange-600 rounded-lg md:bg-transparent md:text-orange-500 md:p-0 cursor-pointer transition-colors duration-200"
                     aria-current="page"
                     onClick={() => setIsMenuOpen(false)}
@@ -185,7 +185,7 @@ export default function Navbar() {
                 </li>
                 <li>
                   <Link
-                    href="/discover"
+                    href="/app/discover"
                     className="flex items-center py-2 px-3 text-white rounded-lg hover:bg-zinc-700 md:hover:bg-transparent md:hover:text-orange-500 md:p-0 cursor-pointer transition-colors duration-200 mt-2"
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -217,7 +217,7 @@ export default function Navbar() {
                 {/* Mobile Profile */}
                 <li>
                   <Link
-                    href="/profile"
+                    href="/app/profile"
                     className="flex items-center py-2 px-3 text-white rounded-lg hover:bg-zinc-700 md:hover:bg-transparent md:hover:text-orange-500 md:p-0 cursor-pointer transition-colors duration-200 mt-2"
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -235,7 +235,7 @@ export default function Navbar() {
           <ul className="flex flex-row p-0 mt-0 space-x-8 font-medium">
             <li>
               <Link
-                href="/feed"
+                href="/app"
                 className="block py-2 px-3 text-white hover:text-orange-400 cursor-pointer transition-colors duration-200"
                 aria-current="page"
               >
@@ -244,7 +244,7 @@ export default function Navbar() {
             </li>
             <li>
               <Link
-                href="/discover"
+                href="/app/discover"
                 className="block py-2 px-3 text-white hover:text-orange-400 cursor-pointer transition-colors duration-200"
               >
                 Discover
