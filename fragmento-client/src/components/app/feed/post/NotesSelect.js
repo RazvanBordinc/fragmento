@@ -1,12 +1,21 @@
 /** @format */
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { Droplets, Search, X, Check } from "lucide-react";
+import {
+  Droplets,
+  Search,
+  X,
+  Check,
+  ArrowUp,
+  ArrowDown,
+  Leaf,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function NotesSelect({ notes, updateFormData }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("unspecified");
   const dropdownRef = useRef(null);
 
   // Common fragrance notes collection
@@ -79,28 +88,49 @@ export default function NotesSelect({ notes, updateFormData }) {
   };
 
   // Toggle a note
-  const toggleNote = (noteName) => {
-    if (notes.includes(noteName)) {
-      updateFormData(
-        "notes",
-        notes.filter((note) => note !== noteName)
-      );
+  const toggleNote = (noteName, noteCategory) => {
+    // Check if the note is already added
+    const existingNoteIndex = notes.findIndex((note) =>
+      typeof note === "object" ? note.name === noteName : note === noteName
+    );
+
+    if (existingNoteIndex >= 0) {
+      // Remove note
+      const updatedNotes = [...notes];
+      updatedNotes.splice(existingNoteIndex, 1);
+      updateFormData("notes", updatedNotes);
     } else {
-      updateFormData("notes", [...notes, noteName]);
+      // Add note with category
+      const newNote = noteCategory
+        ? { name: noteName, category: noteCategory }
+        : noteName;
+      updateFormData("notes", [...notes, newNote]);
     }
   };
 
   // Add a custom note that's not in the list
   const addCustomNote = () => {
-    if (
-      searchTerm.trim() &&
-      !notes.includes(searchTerm.trim()) &&
-      !commonNotes.some(
+    if (searchTerm.trim()) {
+      const existingNote = notes.find((note) =>
+        typeof note === "object"
+          ? note.name === searchTerm.trim()
+          : note === searchTerm.trim()
+      );
+
+      const existingCommonNote = commonNotes.find(
         (note) => note.name.toLowerCase() === searchTerm.trim().toLowerCase()
-      )
-    ) {
-      updateFormData("notes", [...notes, searchTerm.trim()]);
-      setSearchTerm("");
+      );
+
+      if (!existingNote && !existingCommonNote) {
+        // Add note with the selected category
+        const newNote =
+          selectedCategory !== "unspecified"
+            ? { name: searchTerm.trim(), category: selectedCategory }
+            : searchTerm.trim();
+
+        updateFormData("notes", [...notes, newNote]);
+        setSearchTerm("");
+      }
     }
   };
 
@@ -125,12 +155,44 @@ export default function NotesSelect({ notes, updateFormData }) {
     { top: [], middle: [], base: [] }
   );
 
-  // Map category to readable name
-  const categoryNames = {
-    top: "Top Notes",
-    middle: "Middle Notes",
-    base: "Base Notes",
+  // Map category to readable name and icon
+  const categoryInfo = {
+    top: {
+      name: "Top Notes",
+      icon: <ArrowUp size={14} className="text-blue-400" />,
+    },
+    middle: {
+      name: "Middle Notes",
+      icon: <Leaf size={14} className="text-green-400" />,
+    },
+    base: {
+      name: "Base Notes",
+      icon: <ArrowDown size={14} className="text-amber-400" />,
+    },
+    unspecified: {
+      name: "Unspecified",
+      icon: <Droplets size={14} className="text-zinc-400" />,
+    },
   };
+
+  // Group user-selected notes by category
+  const groupUserNotes = () => {
+    const grouped = { top: [], middle: [], base: [], unspecified: [] };
+
+    notes.forEach((note) => {
+      if (typeof note === "object" && note.category) {
+        grouped[note.category].push(note);
+      } else {
+        grouped.unspecified.push({
+          name: typeof note === "object" ? note.name : note,
+        });
+      }
+    });
+
+    return grouped;
+  };
+
+  const userGroupedNotes = groupUserNotes();
 
   // Animation variants
   const dropdownVariants = {
@@ -144,6 +206,38 @@ export default function NotesSelect({ notes, updateFormData }) {
     exit: { opacity: 0, y: -10, height: 0, transition: { duration: 0.2 } },
   };
 
+  // Helper function to check if a note is in the selected notes array
+  const isNoteSelected = (noteName) => {
+    return notes.some((note) =>
+      typeof note === "object" ? note.name === noteName : note === noteName
+    );
+  };
+
+  // Get the category of a selected note
+  const getSelectedNoteCategory = (noteName) => {
+    const note = notes.find((note) =>
+      typeof note === "object" ? note.name === noteName : note === noteName
+    );
+
+    return typeof note === "object" && note.category
+      ? note.category
+      : "unspecified";
+  };
+
+  // Get color for note based on category
+  const getCategoryColor = (category) => {
+    switch (category) {
+      case "top":
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      case "middle":
+        return "bg-green-500/10 text-green-400 border-green-500/20";
+      case "base":
+        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+      default:
+        return "bg-zinc-700/60 text-zinc-200 border-zinc-600/40";
+    }
+  };
+
   return (
     <div className="bg-gradient-to-br from-zinc-800 to-zinc-800/90 rounded-lg p-5 border border-zinc-700/80 shadow-lg">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
@@ -153,7 +247,7 @@ export default function NotesSelect({ notes, updateFormData }) {
         Fragrance Notes
       </h3>
       <p className="text-zinc-400 text-sm mb-4">
-        Select the fragrance notes you can detect.
+        Select the fragrance notes you can detect and specify their category.
       </p>
 
       {/* Dropdown container */}
@@ -224,55 +318,97 @@ export default function NotesSelect({ notes, updateFormData }) {
                   )}
                 </div>
 
-                {/* Option to add custom note */}
+                {/* Option to add custom note with category selection */}
                 {searchTerm &&
                   !commonNotes.some(
                     (note) =>
                       note.name.toLowerCase() ===
                       searchTerm.trim().toLowerCase()
                   ) &&
-                  !notes.includes(searchTerm.trim()) && (
-                    <button
-                      type="button"
-                      onClick={addCustomNote}
-                      className="mt-2 w-full flex items-center px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-md text-sm transition-colors cursor-pointer"
-                    >
-                      <span className="mr-1">+</span> Add "{searchTerm}" as
-                      custom note
-                    </button>
-                  )}
-              </div>
-
-              {/* Notes list */}
-              <div className="max-h-80 overflow-y-auto p-1">
-                {Object.keys(categoryNames).map(
-                  (category) =>
-                    groupedNotes[category] &&
-                    groupedNotes[category].length > 0 && (
-                      <div key={category} className="mb-2">
-                        <div className="px-3 py-1.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                          {categoryNames[category]}
-                        </div>
-                        {groupedNotes[category].map((note, index) => (
+                  !isNoteSelected(searchTerm.trim()) && (
+                    <div className="mt-2 bg-blue-500/10 p-2 rounded-md">
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {Object.keys(categoryInfo).map((category) => (
                           <button
-                            key={index}
+                            key={category}
                             type="button"
-                            className={`flex items-center justify-between w-full px-3 py-2.5 text-left rounded-md transition-colors cursor-pointer ${
-                              notes.includes(note.name)
-                                ? "bg-blue-500/20 text-blue-300"
-                                : "text-zinc-300 hover:bg-zinc-700"
+                            onClick={() => setSelectedCategory(category)}
+                            className={`flex items-center cursor-pointer px-2 py-1 text-xs rounded-full border ${
+                              selectedCategory === category
+                                ? getCategoryColor(category)
+                                : "bg-zinc-700 text-zinc-300 border-zinc-600"
                             }`}
-                            onClick={() => toggleNote(note.name)}
                           >
-                            {note.name}
-                            {notes.includes(note.name) && (
-                              <Check className="h-4 w-4 text-blue-400" />
-                            )}
+                            <span className="mr-1">
+                              {categoryInfo[category].icon}
+                            </span>
+                            {categoryInfo[category].name}
                           </button>
                         ))}
                       </div>
-                    )
-                )}
+                      <button
+                        type="button"
+                        onClick={addCustomNote}
+                        className="w-full flex items-center justify-center px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-md text-sm transition-colors cursor-pointer"
+                      >
+                        <span className="mr-1">+</span> Add "{searchTerm}" as{" "}
+                        {selectedCategory} note
+                      </button>
+                    </div>
+                  )}
+              </div>
+
+              {/* Notes list grouped by category */}
+              <div className="max-h-80 overflow-y-auto p-1">
+                {Object.keys(categoryInfo)
+                  .slice(0, 3)
+                  .map(
+                    (category) =>
+                      groupedNotes[category] &&
+                      groupedNotes[category].length > 0 && (
+                        <div key={category} className="mb-2">
+                          <div className="px-3 py-1.5 flex items-center text-xs font-medium uppercase tracking-wider">
+                            {categoryInfo[category].icon}
+                            <span className="ml-1 text-zinc-400">
+                              {categoryInfo[category].name}
+                            </span>
+                          </div>
+                          {groupedNotes[category].map((note, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className={`flex items-center justify-between w-full px-3 py-2.5 text-left rounded-md transition-colors cursor-pointer ${
+                                isNoteSelected(note.name)
+                                  ? `${getCategoryColor(
+                                      getSelectedNoteCategory(note.name)
+                                    )}`
+                                  : "text-zinc-300 hover:bg-zinc-700"
+                              }`}
+                              onClick={() =>
+                                toggleNote(note.name, note.category)
+                              }
+                            >
+                              {note.name}
+                              {isNoteSelected(note.name) && (
+                                <Check
+                                  className={`h-4 w-4 ${
+                                    getSelectedNoteCategory(note.name) === "top"
+                                      ? "text-blue-400"
+                                      : getSelectedNoteCategory(note.name) ===
+                                        "middle"
+                                      ? "text-green-400"
+                                      : getSelectedNoteCategory(note.name) ===
+                                        "base"
+                                      ? "text-amber-400"
+                                      : "text-zinc-400"
+                                  }`}
+                                />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                  )}
 
                 {/* No results message */}
                 {getFilteredNotes().length === 0 && (
@@ -286,33 +422,49 @@ export default function NotesSelect({ notes, updateFormData }) {
         </AnimatePresence>
       </div>
 
-      {/* Selected notes display */}
+      {/* Selected notes display grouped by category */}
       {notes.length > 0 && (
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-zinc-300 mb-2">
-            Selected Notes:
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {notes.map((note, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center justify-between bg-zinc-700/60 rounded-lg px-3 py-2 border border-zinc-600/40 group"
-              >
-                <span className="text-zinc-200 text-sm truncate pr-1">
-                  {note}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => toggleNote(note)}
-                  className="text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </motion.div>
-            ))}
-          </div>
+        <div className="mt-4 space-y-4">
+          {Object.entries(userGroupedNotes).map(
+            ([category, categoryNotes]) =>
+              categoryNotes.length > 0 && (
+                <div key={category} className="space-y-2">
+                  <h4 className="text-sm font-medium flex items-center">
+                    {categoryInfo[category].icon}
+                    <span className="ml-1 text-zinc-300">
+                      {categoryInfo[category].name}:
+                    </span>
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {categoryNotes.map((note, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={`flex items-center justify-between rounded-lg px-3 py-2 border ${getCategoryColor(
+                          category
+                        )}`}
+                      >
+                        <span className="text-sm truncate pr-1">
+                          {typeof note === "object" ? note.name : note}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleNote(
+                              typeof note === "object" ? note.name : note
+                            )
+                          }
+                          className="text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          <X size={16} />
+                        </button>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )
+          )}
         </div>
       )}
     </div>

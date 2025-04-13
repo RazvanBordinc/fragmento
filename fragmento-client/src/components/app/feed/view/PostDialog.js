@@ -61,6 +61,7 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
         },
         comments: [],
       };
+      console.log("newpost", newPost);
 
       // Call the onPostCreated callback with the new post
       onPostCreated(newPost);
@@ -98,7 +99,6 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
           initial="hidden"
           animate="visible"
           exit="hidden"
-          onClick={handleClose}
         >
           <motion.div
             className="w-full max-w-3xl mx-auto rounded-xl overflow-hidden"

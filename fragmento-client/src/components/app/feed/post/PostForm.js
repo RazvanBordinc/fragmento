@@ -241,7 +241,15 @@ export default function PostForm({ onSubmit }) {
         break;
     }
   };
+  const getNoteDisplayValue = (note) => {
+    return typeof note === "object" && note.name ? note.name : note;
+  };
 
+  const getNoteCategory = (note) => {
+    return typeof note === "object" && note.category
+      ? note.category
+      : "unspecified";
+  };
   // Function to save the current section and move back to overview
   const saveCurrentSection = () => {
     // Additional validation could happen here
@@ -289,14 +297,14 @@ export default function PostForm({ onSubmit }) {
 
   return (
     <div className="max-w-3xl mx-auto bg-zinc-900 md:rounded-b-xl overflow-hidden shadow-xl relative">
-      <div className="bg-gradient-to-r from-zinc-800 to-zinc-800/90 px-4 sticky top-0 z-10 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-zinc-800 to-zinc-800/90 px-4 sticky top-0 z-10 flex items-center justify-between py-2">
         {activeTab && (
           <button
             type="button"
             onClick={saveCurrentSection}
-            className="text-zinc-400 hover:text-zinc-200 p-1 rounded-full cursor-pointer"
+            className="text-orange-600 font-bold hover:scale-[1.1] p-1 rounded-md cursor-pointer flex items-center bg-orange-300 tracking-wide uppercase transition-transform"
           >
-            <X size={18} />
+            <X className="stroke-4 mr-1" size={18} /> Close section
           </button>
         )}
       </div>
@@ -488,7 +496,7 @@ export default function PostForm({ onSubmit }) {
                             key={idx}
                             className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full truncate"
                           >
-                            {note}
+                            {getNoteDisplayValue(note)}
                           </span>
                         ))}
                         {formData.notes.length > 3 && (

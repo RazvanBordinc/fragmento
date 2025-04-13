@@ -52,11 +52,11 @@ export default function Navbar() {
           className="flex items-center space-x-3 cursor-pointer transition-transform duration-200 hover:scale-105"
         >
           <Image
+            className="w-auto h-auto"
             src="/Logo.png"
-            className="h-8 w-auto"
             alt="Fragmento Logo"
-            width={32}
-            height={32}
+            width={20}
+            height={20}
           />
           <span className="self-center text-2xl font-semibold whitespace-nowrap text-white">
             Fragmento
