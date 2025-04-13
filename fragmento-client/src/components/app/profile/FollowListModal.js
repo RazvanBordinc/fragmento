@@ -33,13 +33,9 @@ export default function FollowListModal({
     }
   };
 
-  // Generate initials for profile picture
-  const getInitials = (displayName) => {
-    return displayName
-      .split(" ")
-      .map((name) => name[0])
-      .join("")
-      .toUpperCase();
+  // Generate initial for profile picture from username
+  const getInitial = (username) => {
+    return username.charAt(0).toUpperCase();
   };
 
   // Animation variants
@@ -124,20 +120,17 @@ export default function FollowListModal({
                           {user.profilePic ? (
                             <img
                               src={user.profilePic}
-                              alt={user.displayName}
+                              alt={user.username}
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
-                            getInitials(user.displayName)
+                            getInitial(user.username)
                           )}
                         </div>
 
-                        {/* User info */}
+                        {/* User info - showing only username */}
                         <div className="ml-3">
                           <div className="font-medium text-white">
-                            {user.displayName}
-                          </div>
-                          <div className="text-sm text-zinc-400">
                             @{user.username}
                           </div>
                           <div className="text-xs text-zinc-500 mt-0.5">

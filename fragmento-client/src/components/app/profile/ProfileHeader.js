@@ -8,11 +8,8 @@ export default function ProfileHeader({ userData, onOpenFollowModal }) {
   const randomGradient = `linear-gradient(135deg, #653d84 0%, #333399 50%, #00a8cc 100%)`;
 
   // Generate initials for profile picture if none provided
-  const initials = userData.displayName
-    .split(" ")
-    .map((name) => name[0])
-    .join("")
-    .toUpperCase();
+  // Now using username instead of displayName
+  const initials = userData.username.charAt(0).toUpperCase();
 
   return (
     <div className="mb-4">
@@ -36,7 +33,7 @@ export default function ProfileHeader({ userData, onOpenFollowModal }) {
             {userData.profilePic ? (
               <img
                 src={userData.profilePic}
-                alt={userData.displayName}
+                alt={userData.username}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -47,10 +44,10 @@ export default function ProfileHeader({ userData, onOpenFollowModal }) {
 
         {/* Profile info */}
         <div className="pt-16 pb-4">
+          {/* Display only username as the main title (instead of displayName) */}
           <h1 className="text-2xl font-bold text-white">
-            {userData.displayName}
+            @{userData.username}
           </h1>
-          <p className="text-zinc-400 mb-3">@{userData.username}</p>
 
           {userData.bio && (
             <p className="text-zinc-300 mb-5 max-w-xl">{userData.bio}</p>

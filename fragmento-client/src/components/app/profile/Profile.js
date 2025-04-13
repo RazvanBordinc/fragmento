@@ -20,13 +20,13 @@ import ProfileHeader from "./ProfileHeader";
 import FollowListModal from "./FollowListModal";
 import ToastNotification from "../feed/view/ToastNotification";
 import LoadingOverlay from "../feed/post/LoadingOverlay";
+import ProfileEditModal from "./ProfileEditModal";
 
 export default function ProfilePage() {
-  // User data
+  // User data - removed displayName field
   const [userData, setUserData] = useState({
     id: "current-user-123",
     username: "fragrancefan",
-    displayName: "Fragrance Enthusiast",
     bio: "Passionate about discovering unique scents. Coffee lover, dog person, and fragrance collector since 2018.",
     profilePic: null,
     coverPic: null,
@@ -50,6 +50,9 @@ export default function ProfilePage() {
     message: "",
     type: "success",
   });
+
+  // Profile edit modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Follow list modals
   const [followModal, setFollowModal] = useState({
@@ -154,11 +157,19 @@ export default function ProfilePage() {
     }
   };
 
+  // Updated to open the edit modal
   const handleEditProfile = () => {
-    // Would open profile edit modal in a real app
+    setIsEditModalOpen(true);
+  };
+
+  // Handle profile update from modal
+  const handleSaveProfile = (updatedUserData) => {
+    setUserData(updatedUserData);
+
+    // Show success toast
     setToast({
       visible: true,
-      message: "Edit profile feature coming soon!",
+      message: "Profile updated successfully!",
       type: "success",
     });
   };
@@ -240,24 +251,14 @@ export default function ProfilePage() {
   };
 
   // Filter followers/following based on search query
-  const filteredFollowers = followers.filter(
-    (follower) =>
-      follower.username
-        .toLowerCase()
-        .includes(followModal.searchQuery.toLowerCase()) ||
-      follower.displayName
-        .toLowerCase()
-        .includes(followModal.searchQuery.toLowerCase())
+  const filteredFollowers = followers.filter((follower) =>
+    follower.username
+      .toLowerCase()
+      .includes(followModal.searchQuery.toLowerCase())
   );
 
-  const filteredFollowing = following.filter(
-    (user) =>
-      user.username
-        .toLowerCase()
-        .includes(followModal.searchQuery.toLowerCase()) ||
-      user.displayName
-        .toLowerCase()
-        .includes(followModal.searchQuery.toLowerCase())
+  const filteredFollowing = following.filter((user) =>
+    user.username.toLowerCase().includes(followModal.searchQuery.toLowerCase())
   );
 
   return (
@@ -282,7 +283,7 @@ export default function ProfilePage() {
         <div className="flex space-x-2">
           <motion.button
             onClick={handleEditProfile}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white font-medium "
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white font-medium"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
           >
@@ -328,16 +329,7 @@ export default function ProfilePage() {
                       label: "Account Settings",
                       icon: <User size={16} />,
                     },
-                    {
-                      id: "notifications",
-                      label: "Notifications",
-                      icon: <Bell size={16} />,
-                    },
-                    {
-                      id: "privacy",
-                      label: "Privacy & Security",
-                      icon: <Shield size={16} />,
-                    },
+
                     {
                       id: "help",
                       label: "Help Center",
@@ -435,6 +427,14 @@ export default function ProfilePage() {
         )}
       </div>
 
+      {/* Profile edit modal */}
+      <ProfileEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        userData={userData}
+        onSave={handleSaveProfile}
+      />
+
       {/* Followers/Following Modal */}
       <FollowListModal
         isOpen={followModal.isOpen}
@@ -457,7 +457,7 @@ export default function ProfilePage() {
   );
 }
 
-// Sample data
+// Sample data - updated to remove displayName
 const samplePosts = [
   {
     id: "post1",
@@ -569,39 +569,35 @@ const samplePosts = [
   },
 ];
 
+// Sample followers and following lists updated to remove displayName
 const sampleFollowers = [
   {
     id: "user123",
     username: "scent_lover",
-    displayName: "Scent Enthusiast",
     profilePic: null,
     followedAt: "2023-05-12T10:30:00Z",
   },
   {
     id: "user456",
     username: "perfumemaster",
-    displayName: "Perfume Master",
     profilePic: null,
     followedAt: "2023-08-22T14:15:00Z",
   },
   {
     id: "user789",
     username: "scentexplorer",
-    displayName: "Scent Explorer",
     profilePic: null,
     followedAt: "2024-01-30T09:45:00Z",
   },
   {
     id: "user101",
     username: "fragrancelover",
-    displayName: "Fragrance Lover",
     profilePic: null,
     followedAt: "2024-02-15T11:20:00Z",
   },
   {
     id: "user202",
     username: "aromaaddict",
-    displayName: "Aroma Addict",
     profilePic: null,
     followedAt: "2024-03-05T16:40:00Z",
   },
@@ -611,35 +607,30 @@ const sampleFollowing = [
   {
     id: "user303",
     username: "perfumery",
-    displayName: "The Perfumery",
     profilePic: null,
     followedAt: "2023-04-18T12:30:00Z",
   },
   {
     id: "user404",
     username: "scentcritic",
-    displayName: "Scent Critic",
     profilePic: null,
     followedAt: "2023-07-29T15:45:00Z",
   },
   {
     id: "user505",
     username: "fragranceworld",
-    displayName: "Fragrance World",
     profilePic: null,
     followedAt: "2023-10-11T08:20:00Z",
   },
   {
     id: "user606",
     username: "perfumetrends",
-    displayName: "Perfume Trends",
     profilePic: null,
     followedAt: "2024-01-05T10:10:00Z",
   },
   {
     id: "user707",
     username: "scentstudio",
-    displayName: "Scent Studio",
     profilePic: null,
     followedAt: "2024-03-18T14:30:00Z",
   },

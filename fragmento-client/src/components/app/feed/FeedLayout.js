@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import PostDialog from "./view/PostDialog";
 import FragrancePost from "./view/FragrancePost";
 import ToastNotification from "./view/ToastNotification";
+import { usePathname } from "next/navigation";
 
 export default function FeedLayout() {
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
@@ -16,7 +17,7 @@ export default function FeedLayout() {
     message: "",
     type: "success",
   });
-
+  const pathname = usePathname();
   // Current user information - needed for comment functionality
   const currentUser = {
     id: "current-user-123",
@@ -74,12 +75,15 @@ export default function FeedLayout() {
       />
 
       {/* Left sidebar */}
-      <div className="w-1/6 hidden md:block border-r border-zinc-800">
+      <div
+        className={`w-1/4 hidden md:block border-r-2border-zinc-800 bg-gradient-to-l from-zinc-800  to-zinc-950`}
+      >
         {/* Sidebar content would go here */}
       </div>
 
       {/* Main content */}
-      <div className="mx-auto w-full md:w-4/6 max-w-3xl px-4 py-6">
+      <div className="mx-auto w-full md:w-3/6 px-4 py-6 z-20 relative">
+        <div className="absolute inset-0 blur-sm shadow-lg shadow-white animate-pulse size-full"></div>
         {/* Feed of posts */}
         <div className="space-y-6">
           <AnimatePresence>
@@ -152,7 +156,9 @@ export default function FeedLayout() {
       </div>
 
       {/* Right sidebar */}
-      <div className="w-1/6 hidden md:block border-l border-zinc-800">
+      <div
+        className={`w-1/4 hidden md:block border-l border-zinc-800 bg-gradient-to-r from-zinc-800 to-zinc-950`}
+      >
         {/* Sidebar content would go here */}
       </div>
     </div>

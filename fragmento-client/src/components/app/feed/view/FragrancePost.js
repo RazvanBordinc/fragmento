@@ -348,11 +348,7 @@ export default function FragrancePost({
               />
             ))}
           </div>
-        ) : (
-          <div className="mt-3 h-64 bg-gradient-to-br from-zinc-700/60 to-zinc-800/70 rounded-md flex items-center justify-center">
-            <div className="text-zinc-500 text-lg font-medium">No Images</div>
-          </div>
-        )}
+        ) : null}
       </div>
 
       {/* Tags section - always visible */}
