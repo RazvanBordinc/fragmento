@@ -19,6 +19,7 @@ import {
   Bell,
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
+import SearchBar from "./SearchBar"; // Import our new SearchBar component
 
 const lavishly_Yours = Lavishly_Yours({
   subsets: ["latin"],
@@ -29,7 +30,6 @@ const lavishly_Yours = Lavishly_Yours({
 export default function Navbar() {
   // State hooks
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(3); // Example unread count
   const pathname = usePathname();
@@ -68,18 +68,6 @@ export default function Navbar() {
     setIsNotificationsOpen(!isNotificationsOpen);
     // Reset unread count when opening
     if (!isNotificationsOpen) setUnreadNotifications(0);
-  };
-
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-  };
-
-  // Handle search form submission
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    console.log("Searching for:", searchQuery);
-    // Implement search functionality here
   };
 
   // Check if a specific route is active
@@ -288,24 +276,9 @@ export default function Navbar() {
 
         {/* Desktop Search and Mobile Toggle */}
         <div className="flex md:order-2 relative z-20">
-          {/* Mobile search button */}
-
-          {/* Desktop Search */}
-          <div className="relative hidden md:block">
-            <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-              <Search className="w-4 h-4 text-zinc-400" />
-              <span className="sr-only">Search icon</span>
-            </div>
-            <form onSubmit={handleSearchSubmit}>
-              <input
-                type="text"
-                id="search-navbar"
-                className="block w-full p-2 ps-10 text-sm text-white border border-zinc-700 rounded-lg bg-zinc-800 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-400 transition-colors duration-200 cursor-pointer"
-                placeholder="Search people"
-                value={searchQuery}
-                onChange={handleSearchChange}
-              />
-            </form>
+          {/* Desktop Search - REPLACED WITH NEW SEARCHBAR COMPONENT */}
+          <div className="relative hidden md:flex items-center z-30">
+            <SearchBar />
           </div>
 
           {/* Notifications Button (Desktop) */}
@@ -376,7 +349,7 @@ export default function Navbar() {
           </motion.button>
         </div>
 
-        {/* Mobile Menu - Keep the original implementation */}
+        {/* Mobile Menu */}
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div
@@ -388,21 +361,9 @@ export default function Navbar() {
               className="items-center justify-between w-full md:hidden md:w-auto md:order-1 z-30"
               id="navbar-search"
             >
-              {/* Mobile Search */}
-              <div className="relative mt-3">
-                <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-                  <Search className="w-4 h-4 text-zinc-400" />
-                </div>
-                <form onSubmit={handleSearchSubmit}>
-                  <input
-                    type="text"
-                    id="search-navbar-mobile"
-                    className="block w-full p-2 ps-10 text-sm text-white border border-zinc-700 rounded-lg bg-zinc-800 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-400 transition-colors duration-200 cursor-pointer"
-                    placeholder="Search fragrances or people..."
-                    value={searchQuery}
-                    onChange={handleSearchChange}
-                  />
-                </form>
+              {/* Mobile Search - REPLACED WITH NEW SEARCHBAR COMPONENT */}
+              <div className="flex justify-center mt-3">
+                <SearchBar />
               </div>
 
               {/* Mobile Navigation - Same as original but with active states */}
