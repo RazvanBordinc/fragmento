@@ -297,10 +297,10 @@ export default function CommentsSection({
               whileTap={{ scale: 0.95 }}
               onClick={handleAddComment}
               disabled={newComment.trim() === ""}
-              className={`rounded-full w-8 h-8 flex items-center justify-center cursor-pointer ${
+              className={`rounded-full w-8 h-8 flex items-center justify-center ${
                 newComment.trim() === ""
                   ? "bg-zinc-700/60 text-zinc-500 cursor-not-allowed"
-                  : "bg-orange-600 text-white"
+                  : "bg-orange-600 text-white cursor-pointer"
               }`}
             >
               <Send size={16} />

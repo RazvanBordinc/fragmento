@@ -3,12 +3,15 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-export default function ProfileHeader({ userData, onOpenFollowModal }) {
+export default function ProfileHeader({
+  userData,
+  onOpenFollowModal,
+  isOwnProfile = true,
+}) {
   // Generate a random gradient for cover image if none provided
   const randomGradient = `linear-gradient(135deg, #653d84 0%, #333399 50%, #00a8cc 100%)`;
 
   // Generate initials for profile picture if none provided
-  // Now using username instead of displayName
   const initials = userData.username.charAt(0).toUpperCase();
 
   return (
@@ -44,7 +47,7 @@ export default function ProfileHeader({ userData, onOpenFollowModal }) {
 
         {/* Profile info */}
         <div className="pt-16 pb-4">
-          {/* Display only username as the main title (instead of displayName) */}
+          {/* Display username as the main title */}
           <h1 className="text-2xl font-bold text-white">
             @{userData.username}
           </h1>

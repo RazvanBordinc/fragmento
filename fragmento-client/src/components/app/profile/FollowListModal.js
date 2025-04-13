@@ -3,6 +3,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, UserMinus, UserX } from "lucide-react";
+import Link from "next/link";
 
 export default function FollowListModal({
   isOpen,
@@ -14,6 +15,7 @@ export default function FollowListModal({
   onRemoveFollower,
   onUnfollow,
   currentUserId,
+  isOwnProfile = true,
 }) {
   // Calculate date display
   const formatDate = (dateString) => {
@@ -114,7 +116,10 @@ export default function FollowListModal({
                       whileHover={{ backgroundColor: "rgba(41, 37, 46, 0.7)" }}
                       layout
                     >
-                      <div className="flex items-center">
+                      <Link
+                        href={`/app/${user.username}`}
+                        className="flex items-center flex-1 cursor-pointer"
+                      >
                         {/* User avatar */}
                         <div className="w-12 h-12 bg-gradient-to-br from-zinc-700 to-zinc-800 rounded-full flex items-center justify-center text-base font-semibold text-white">
                           {user.profilePic ? (
@@ -140,12 +145,12 @@ export default function FollowListModal({
                             {formatDate(user.followedAt)}
                           </div>
                         </div>
-                      </div>
+                      </Link>
 
-                      {/* Action button */}
-                      {user.id !== currentUserId && (
+                      {/* Action button - Only show on own profile */}
+                      {isOwnProfile && user.id !== currentUserId && (
                         <motion.button
-                          className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${
+                          className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer ${
                             type === "followers"
                               ? "bg-red-900/20 text-red-400 hover:bg-red-900/40"
                               : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
@@ -161,12 +166,12 @@ export default function FollowListModal({
                           {type === "followers" ? (
                             <>
                               <UserX size={14} />
-                              <span className="cursor-pointer">Remove</span>
+                              <span>Remove</span>
                             </>
                           ) : (
                             <>
                               <UserMinus size={14} />
-                              <span className="cursor-pointer">Unfollow</span>
+                              <span>Unfollow</span>
                             </>
                           )}
                         </motion.button>

@@ -15,7 +15,10 @@ import {
   House,
   Telescope,
   Bookmark,
+  HelpCircle,
+  Bell,
 } from "lucide-react";
+import NotificationsDropdown from "./NotificationsDropdown";
 
 const lavishly_Yours = Lavishly_Yours({
   subsets: ["latin"],
@@ -27,16 +30,25 @@ export default function Navbar() {
   // State hooks
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(3); // Example unread count
   const pathname = usePathname();
 
-  // Ref for detecting outside clicks
+  // Refs for detecting outside clicks
   const menuRef = useRef(null);
+  const notificationsRef = useRef(null);
 
-  // Handle clicks outside to close menu
+  // Handle clicks outside to close menu and notifications
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
+      }
+      if (
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target)
+      ) {
+        setIsNotificationsOpen(false);
       }
     };
 
@@ -47,6 +59,15 @@ export default function Navbar() {
   // Toggle mobile menu
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+    // Close notifications if menu is opening
+    if (!isMenuOpen) setIsNotificationsOpen(false);
+  };
+
+  // Toggle notifications dropdown
+  const toggleNotifications = () => {
+    setIsNotificationsOpen(!isNotificationsOpen);
+    // Reset unread count when opening
+    if (!isNotificationsOpen) setUnreadNotifications(0);
   };
 
   // Handle search input change
@@ -75,6 +96,8 @@ export default function Navbar() {
         return "text-blue-500";
       } else if (route === "/app/saved") {
         return "text-purple-500";
+      } else if (route === "/app/notifications") {
+        return "text-orange-500";
       }
     }
 
@@ -84,6 +107,8 @@ export default function Navbar() {
       return "text-white hover:text-blue-400";
     } else if (route === "/app/saved") {
       return "text-white hover:text-purple-400";
+    } else if (route === "/app/notifications") {
+      return "text-white hover:text-orange-400";
     }
 
     return "text-white hover:text-orange-400";
@@ -98,10 +123,15 @@ export default function Navbar() {
         return "bg-blue-600 text-white";
       } else if (route === "/app/saved") {
         return "bg-purple-600 text-white";
+      } else if (route === "/app/notifications") {
+        return "bg-orange-600 text-white";
+      } else if (route === "/app/help") {
+        return "bg-zinc-700 text-white";
       }
     }
     return "text-white hover:bg-zinc-700";
   };
+
   const getBorderColor = (route) => {
     if (isActive(route)) {
       if (route === "/app") {
@@ -110,6 +140,8 @@ export default function Navbar() {
         return "border-blue-500";
       } else if (route === "/app/saved") {
         return "border-purple-500";
+      } else if (route === "/app/notifications") {
+        return "border-orange-500";
       }
     }
     return "border-zinc-500";
@@ -268,7 +300,7 @@ export default function Navbar() {
               <input
                 type="text"
                 id="search-navbar"
-                className="block w-full p-2 ps-10 text-sm text-white border border-zinc-700 rounded-lg bg-zinc-800 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-400 transition-colors duration-200"
+                className="block w-full p-2 ps-10 text-sm text-white border border-zinc-700 rounded-lg bg-zinc-800 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-400 transition-colors duration-200 cursor-pointer"
                 placeholder="Search people"
                 value={searchQuery}
                 onChange={handleSearchChange}
@@ -276,16 +308,39 @@ export default function Navbar() {
             </form>
           </div>
 
-          {/* Wishlist Button (Desktop) */}
-          <div className="hidden md:block ml-3">
-            <Link href="/wishlist">
+          {/* Notifications Button (Desktop) */}
+          <div className="hidden md:block ml-3 relative" ref={notificationsRef}>
+            <motion.button
+              onClick={toggleNotifications}
+              className="flex items-center justify-center text-zinc-400 hover:text-white p-2 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-700 transition duration-200 relative"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Bell size={22} />
+              {unreadNotifications > 0 && (
+                <span className="absolute top-0 right-0 bg-orange-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                  {unreadNotifications}
+                </span>
+              )}
+              <span className="sr-only">Notifications</span>
+            </motion.button>
+
+            {/* Notifications Dropdown */}
+            <AnimatePresence>
+              {isNotificationsOpen && <NotificationsDropdown />}
+            </AnimatePresence>
+          </div>
+
+          {/* Help Center Button (Desktop) */}
+          <div className="hidden md:block ml-1">
+            <Link href="/app/help">
               <motion.button
                 className="flex items-center justify-center text-zinc-400 hover:text-white p-2 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-700 transition duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Heart size={22} />
-                <span className="sr-only">Wishlist</span>
+                <HelpCircle size={22} />
+                <span className="sr-only">Help Center</span>
               </motion.button>
             </Link>
           </div>
@@ -342,7 +397,7 @@ export default function Navbar() {
                   <input
                     type="text"
                     id="search-navbar-mobile"
-                    className="block w-full p-2 ps-10 text-sm text-white border border-zinc-700 rounded-lg bg-zinc-800 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-400 transition-colors duration-200"
+                    className="block w-full p-2 ps-10 text-sm text-white border border-zinc-700 rounded-lg bg-zinc-800 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-400 transition-colors duration-200 cursor-pointer"
                     placeholder="Search fragrances or people..."
                     value={searchQuery}
                     onChange={handleSearchChange}
@@ -357,7 +412,7 @@ export default function Navbar() {
                     href="/app"
                     className={`flex items-center py-2 px-3 rounded-lg transition-colors duration-200 ${getMobileActiveClass(
                       "/app"
-                    )}`}
+                    )} cursor-pointer`}
                     aria-current={isActive("/app") ? "page" : undefined}
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -370,7 +425,7 @@ export default function Navbar() {
                     href="/app/discover"
                     className={`flex items-center py-2 px-3 rounded-lg transition-colors duration-200 mt-2 ${getMobileActiveClass(
                       "/app/discover"
-                    )}`}
+                    )} cursor-pointer`}
                     aria-current={
                       isActive("/app/discover") ? "page" : undefined
                     }
@@ -385,7 +440,7 @@ export default function Navbar() {
                     href="/app/saved"
                     className={`flex items-center py-2 px-3 rounded-lg transition-colors duration-200 mt-2 ${getMobileActiveClass(
                       "/app/saved"
-                    )}`}
+                    )} cursor-pointer`}
                     aria-current={isActive("/app/saved") ? "page" : undefined}
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -394,27 +449,51 @@ export default function Navbar() {
                   </Link>
                 </li>
 
-                {/* Mobile Wishlist */}
+                {/* Notifications (Mobile) */}
                 <li>
                   <Link
-                    href="/wishlist"
-                    className="flex items-center py-2 px-3 text-white rounded-lg hover:bg-zinc-700 transition-colors duration-200 mt-2"
+                    href="/app/notifications"
+                    className={`flex items-center py-2 px-3 rounded-lg transition-colors duration-200 mt-2 ${getMobileActiveClass(
+                      "/app/notifications"
+                    )} cursor-pointer`}
+                    aria-current={
+                      isActive("/app/notifications") ? "page" : undefined
+                    }
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <Heart className="mr-2" size={18} />
-                    Wishlist
+                    <Bell className="mr-2" size={18} />
+                    Notifications
+                    {unreadNotifications > 0 && (
+                      <span className="ml-2 bg-orange-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                        {unreadNotifications}
+                      </span>
+                    )}
                   </Link>
                 </li>
 
-                {/* Mobile Profile */}
+                {/* Profile */}
                 <li>
                   <Link
                     href="/app/profile"
-                    className="flex items-center py-2 px-3 text-white rounded-lg hover:bg-zinc-700 transition-colors duration-200 mt-2"
+                    className="flex items-center py-2 px-3 text-white rounded-lg hover:bg-zinc-700 transition-colors duration-200 mt-2 cursor-pointer"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <User className="mr-2" size={18} />
                     Profile
+                  </Link>
+                </li>
+
+                {/* Help Center */}
+                <li>
+                  <Link
+                    href="/app/help"
+                    className={`flex items-center py-2 px-3 rounded-lg transition-colors duration-200 mt-2 ${getMobileActiveClass(
+                      "/app/help"
+                    )} cursor-pointer`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <HelpCircle className="mr-2" size={18} />
+                    Help Center
                   </Link>
                 </li>
               </ul>

@@ -3,6 +3,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Heart, Trash2, Reply } from "lucide-react";
+import Link from "next/link";
 
 const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
   const isOwnComment = comment.userId === currentUser.id;
@@ -15,17 +16,19 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
       layout
       className="flex items-start gap-2"
     >
-      <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center text-zinc-800 font-bold overflow-hidden flex-shrink-0">
-        {comment.profilePic ? (
-          <img
-            src={comment.profilePic}
-            alt={comment.username}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          comment.username.charAt(0).toUpperCase()
-        )}
-      </div>
+      <Link href={`/app/${comment.username}`} className="cursor-pointer">
+        <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center text-zinc-800 font-bold overflow-hidden flex-shrink-0">
+          {comment.profilePic ? (
+            <img
+              src={comment.profilePic}
+              alt={comment.username}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            comment.username.charAt(0).toUpperCase()
+          )}
+        </div>
+      </Link>
 
       <div className="flex-1">
         <motion.div
@@ -34,9 +37,11 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
           transition={{ duration: 0.2 }}
         >
           <div className="flex justify-between items-start">
-            <div className="text-white text-xs font-medium">
-              {comment.username}
-            </div>
+            <Link href={`/app/${comment.username}`} className="cursor-pointer">
+              <div className="text-white text-xs font-medium hover:text-orange-400 transition-colors">
+                {comment.username}
+              </div>
+            </Link>
             <div className="text-zinc-500 text-xs">{comment.timestamp}</div>
           </div>
           <div className="text-zinc-300 text-sm mt-1">{comment.text}</div>
