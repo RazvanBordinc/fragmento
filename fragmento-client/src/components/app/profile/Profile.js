@@ -7,12 +7,10 @@ import {
   Share,
   Edit3,
   Grid,
-  Bookmark,
   LogOut,
-  Shield,
   HelpCircle,
-  Bell,
   User,
+  Heart,
 } from "lucide-react";
 
 import FragrancePost from "../feed/view/FragrancePost";
@@ -380,8 +378,8 @@ export default function ProfilePage() {
                 : "border-transparent text-zinc-400 hover:text-zinc-300"
             } transition-colors`}
           >
-            <Bookmark size={18} />
-            <span className="font-medium cursor-pointer">Saved</span>
+            <Heart size={18} />
+            <span className="font-medium cursor-pointer">Liked</span>
           </button>
         </div>
       </div>
@@ -458,12 +456,14 @@ export default function ProfilePage() {
 }
 
 // Sample data - updated to remove displayName
+// Sample posts data with descriptions and comments included
+// Sample posts data with single photo and descriptions
 const samplePosts = [
   {
     id: "post1",
     user: {
-      id: "current-user-123",
-      username: "fragrancefan",
+      id: "user456",
+      username: "perfumemaster",
       profilePic: null,
     },
     timestamp: "3 hours ago",
@@ -472,9 +472,13 @@ const samplePosts = [
       name: "Light Blue",
       brand: "Dolce & Gabbana",
       category: "Fresh/Citrus",
-      likes: 32,
+      description:
+        "Light Blue by Dolce & Gabbana is my go-to summer fragrance. I discovered it during a trip to Italy last year, and it perfectly captures that Mediterranean vibe. The Sicilian lemon and apple notes create such a refreshing experience, and I've received numerous compliments when wearing it. It's not the longest-lasting fragrance, but the scent is so perfect for hot days that I don't mind reapplying. If you're looking for something light but distinctive, this is definitely worth trying!",
+      likes: 245,
       occasion: "casual",
-      photos: [],
+      // Single photo instead of photos array
+      photo:
+        "https://images.unsplash.com/photo-1622618991746-fe6004db3a47?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.0.3",
       tags: ["fresh", "summer", "citrus", "light", "everyday"],
       notes: ["Sicilian lemon", "Apple", "Cedar", "Bamboo", "White rose"],
       accords: ["Citrus", "Woody", "Fresh"],
@@ -482,7 +486,7 @@ const samplePosts = [
         overall: 4.5,
         longevity: 3.5,
         sillage: 3.0,
-        scent: 4.8,
+        scent: 2.5,
         value: 4.0,
       },
       seasons: {
@@ -491,7 +495,7 @@ const samplePosts = [
         fall: 2,
         winter: 1,
       },
-      dayNight: 70,
+      dayNight: 70, // 0 = Night, 100 = Day
     },
     comments: [
       {
@@ -499,9 +503,32 @@ const samplePosts = [
         userId: "user789",
         username: "scentexplorer",
         profilePic: null,
-        text: "Great review! I also love this fragrance.",
+        text: "This is my favorite summer fragrance! The citrus notes are perfect for hot days.",
         timestamp: "2 hours ago",
-        likes: 4,
+        likes: 12,
+        isLiked: false,
+        replies: [
+          {
+            id: "reply1",
+            userId: "user456",
+            username: "perfumemaster",
+            profilePic: null,
+            text: "I agree! It's definitely a summer staple. Have you tried the Intense version?",
+            timestamp: "1 hour ago",
+            likes: 3,
+            isLiked: false,
+            replies: [], // Add empty replies array for nested replies
+          },
+        ],
+      },
+      {
+        id: "comment2",
+        userId: "current-user-123", // Current user's comment
+        username: "fragrancefan",
+        profilePic: null,
+        text: "I find the longevity to be a bit weak. Anyone else have this issue?",
+        timestamp: "1 hour ago",
+        likes: 5,
         isLiked: false,
         replies: [],
       },
@@ -510,128 +537,93 @@ const samplePosts = [
   {
     id: "post2",
     user: {
-      id: "current-user-123",
-      username: "fragrancefan",
+      id: "user999",
+      username: "fragranceboutique",
+      profilePic: null,
+    },
+    timestamp: "Yesterday",
+    fragrance: {
+      id: "frag2",
+      name: "Oud Wood",
+      brand: "Tom Ford",
+      category: "Woody/Oriental",
+      description:
+        "Tom Ford's Oud Wood is a masterpiece of modern perfumery. The first time I wore it to a formal dinner, I immediately felt more sophisticated and confident. The blend of rare oud wood with rosewood and cardamom creates a warm, mysterious aura that's perfect for evening events. Though quite expensive, a little goes a long way, and the compliments make it worth every penny. I particularly love wearing this during fall and winter months when the woody notes seem to shine even more. Definitely a signature-worthy scent for those who appreciate luxury fragrances.",
+      likes: 384,
+      occasion: "formal",
+      // Single photo instead of photos array
+      photo:
+        "https://images.unsplash.com/photo-1594035910387-fea47794261f?q=80&w=1480&auto=format&fit=crop&ixlib=rb-4.0.3",
+      tags: ["oud", "luxury", "woody", "spicy", "sophisticated"],
+      notes: ["Oud wood", "Rosewood", "Chinese pepper", "Amber", "Vanilla"],
+      accords: ["Woody", "Oud", "Spicy", "Warm"],
+      ratings: {
+        overall: 4.8,
+        longevity: 4.5,
+        sillage: 4.2,
+        scent: 4.0,
+        value: 3.0,
+      },
+      seasons: {
+        spring: 2,
+        summer: 1,
+        fall: 4,
+        winter: 5,
+      },
+      dayNight: 30, // 0 = Night, 100 = Day
+    },
+    comments: [
+      {
+        id: "comment3",
+        userId: "user321",
+        username: "oudlover",
+        profilePic: null,
+        text: "My signature scent. Worth every penny!",
+        timestamp: "8 hours ago",
+        likes: 22,
+        isLiked: true,
+        replies: [],
+      },
+    ],
+  },
+  {
+    id: "post3",
+    user: {
+      id: "user777",
+      username: "scentcollector",
       profilePic: null,
     },
     timestamp: "2 days ago",
     fragrance: {
-      id: "frag2",
+      id: "frag3",
       name: "Aventus",
       brand: "Creed",
-      category: "Fruity/Woody",
-      likes: 78,
+      category: "Fruity/Chypre",
+      description:
+        "Creed Aventus has been my special occasion fragrance for years now. From my wedding day to important business meetings, this scent never fails to make an impression. The opening blast of pineapple balanced with smoky birch creates a unique contrast that evolves beautifully throughout the day. While batch variations exist, I've found the core DNA remains consistent. Yes, it comes with a hefty price tag, but the confidence it gives me and the memories associated with it make Aventus worth the investment. A true modern classic that deserves its legendary status.",
+      likes: 512,
       occasion: "special",
-      photos: [],
-      tags: ["pineapple", "smoky", "luxurious", "signature", "niche"],
-      notes: ["Pineapple", "Bergamot", "Birch", "Patchouli", "Musk"],
-      accords: ["Fruity", "Woody", "Fresh", "Smoky"],
+      // Single photo instead of photos array
+      photo:
+        "https://images.unsplash.com/photo-1523293182086-7651a899d37f?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3",
+      tags: ["pineapple", "smoky", "fresh", "fruity", "niche"],
+      notes: ["Pineapple", "Bergamot", "Birch", "Ambergris", "Musk"],
+      accords: ["Fruity", "Smoky", "Fresh", "Woody"],
       ratings: {
         overall: 4.9,
-        longevity: 4.5,
-        sillage: 4.0,
-        scent: 5.0,
-        value: 3.5,
+        longevity: 4.0,
+        sillage: 4.3,
+        scent: 3.8,
+        value: 2.5,
       },
       seasons: {
         spring: 4,
-        summer: 4,
+        summer: 3,
         fall: 4,
         winter: 3,
       },
       dayNight: 60,
     },
-    comments: [
-      {
-        id: "comment2",
-        userId: "user456",
-        username: "perfumemaster",
-        profilePic: null,
-        text: "Classic choice! How do you like the latest batch?",
-        timestamp: "1 day ago",
-        likes: 2,
-        isLiked: false,
-        replies: [
-          {
-            id: "reply1",
-            userId: "current-user-123",
-            username: "fragrancefan",
-            profilePic: null,
-            text: "It's really good! I find the pineapple note more pronounced in this batch.",
-            timestamp: "1 day ago",
-            likes: 1,
-            isLiked: false,
-            replies: [],
-          },
-        ],
-      },
-    ],
-  },
-];
-
-// Sample followers and following lists updated to remove displayName
-const sampleFollowers = [
-  {
-    id: "user123",
-    username: "scent_lover",
-    profilePic: null,
-    followedAt: "2023-05-12T10:30:00Z",
-  },
-  {
-    id: "user456",
-    username: "perfumemaster",
-    profilePic: null,
-    followedAt: "2023-08-22T14:15:00Z",
-  },
-  {
-    id: "user789",
-    username: "scentexplorer",
-    profilePic: null,
-    followedAt: "2024-01-30T09:45:00Z",
-  },
-  {
-    id: "user101",
-    username: "fragrancelover",
-    profilePic: null,
-    followedAt: "2024-02-15T11:20:00Z",
-  },
-  {
-    id: "user202",
-    username: "aromaaddict",
-    profilePic: null,
-    followedAt: "2024-03-05T16:40:00Z",
-  },
-];
-
-const sampleFollowing = [
-  {
-    id: "user303",
-    username: "perfumery",
-    profilePic: null,
-    followedAt: "2023-04-18T12:30:00Z",
-  },
-  {
-    id: "user404",
-    username: "scentcritic",
-    profilePic: null,
-    followedAt: "2023-07-29T15:45:00Z",
-  },
-  {
-    id: "user505",
-    username: "fragranceworld",
-    profilePic: null,
-    followedAt: "2023-10-11T08:20:00Z",
-  },
-  {
-    id: "user606",
-    username: "perfumetrends",
-    profilePic: null,
-    followedAt: "2024-01-05T10:10:00Z",
-  },
-  {
-    id: "user707",
-    username: "scentstudio",
-    profilePic: null,
-    followedAt: "2024-03-18T14:30:00Z",
+    comments: [],
   },
 ];

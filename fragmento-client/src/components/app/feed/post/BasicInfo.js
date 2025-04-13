@@ -2,10 +2,23 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { FlaskRound, List, Grid3X3, ChevronDown, Target } from "lucide-react";
+import {
+  FlaskRound,
+  List,
+  Grid3X3,
+  ChevronDown,
+  Target,
+  AlignLeft,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function BasicInfo({ name, brand, category, updateFormData }) {
+export default function BasicInfo({
+  name,
+  brand,
+  category,
+  description,
+  updateFormData,
+}) {
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const categoryRef = useRef(null);
 
@@ -75,7 +88,7 @@ export default function BasicInfo({ name, brand, category, updateFormData }) {
           {/* Brand Input */}
           <div>
             <label
-              htmlFor="name"
+              htmlFor="brand"
               className="flex text-zinc-300 text-sm font-medium mb-2 items-center"
             >
               <span className="bg-orange-500/20 p-1.5 rounded-md mr-2">
@@ -101,7 +114,7 @@ export default function BasicInfo({ name, brand, category, updateFormData }) {
           {/* Category Custom Select */}
           <div ref={categoryRef}>
             <label
-              htmlFor="name"
+              htmlFor="category"
               className="flex text-zinc-300 text-sm font-medium mb-2 items-center"
             >
               {" "}
@@ -163,6 +176,34 @@ export default function BasicInfo({ name, brand, category, updateFormData }) {
               </AnimatePresence>
             </div>
           </div>
+        </div>
+
+        {/* Description Field */}
+        <div>
+          <label
+            htmlFor="description"
+            className="flex text-zinc-300 text-sm font-medium mb-2 items-center"
+          >
+            <span className="bg-orange-500/20 p-1.5 rounded-md mr-2">
+              <AlignLeft className="h-5 w-5 text-orange-400" />
+            </span>{" "}
+            Description
+          </label>
+          <div className="relative group">
+            <textarea
+              id="description"
+              name="description"
+              value={description}
+              onChange={(e) => updateFormData("description", e.target.value)}
+              className="bg-zinc-700/70 text-white block w-full p-3 rounded-lg border border-zinc-600/80 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200 placeholder-zinc-500 min-h-[100px] resize-none"
+              placeholder="Share your thoughts and experiences with this fragrance..."
+            />
+            <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-orange-500 to-orange-600 w-0 group-hover:w-full transition-all duration-300 opacity-50 group-hover:opacity-100"></div>
+          </div>
+          <p className="text-xs text-zinc-500 mt-1">
+            Describe your experience, when to wear it, or any personal stories
+            with this fragrance
+          </p>
         </div>
 
         {/* Visual indicator of completion */}

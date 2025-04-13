@@ -83,7 +83,7 @@ export default function FeedLayout() {
 
       {/* Main content */}
       <div className="mx-auto w-full md:w-3/6 px-4 py-6 z-20 relative">
-        <div className="absolute inset-0 blur-sm shadow-lg shadow-white animate-pulse size-full"></div>
+        <div className="absolute inset-0 blur-sm shadow-lg shadow-whitepo animate-pulse size-full"></div>
         {/* Feed of posts */}
         <div className="space-y-6">
           <AnimatePresence>
@@ -166,6 +166,8 @@ export default function FeedLayout() {
 }
 
 // Sample posts data with comments included
+// Sample posts data with descriptions and comments included
+// Sample posts data with single photo and descriptions
 const samplePosts = [
   {
     id: "post1",
@@ -180,9 +182,13 @@ const samplePosts = [
       name: "Light Blue",
       brand: "Dolce & Gabbana",
       category: "Fresh/Citrus",
+      description:
+        "Light Blue by Dolce & Gabbana is my go-to summer fragrance. I discovered it during a trip to Italy last year, and it perfectly captures that Mediterranean vibe. The Sicilian lemon and apple notes create such a refreshing experience, and I've received numerous compliments when wearing it. It's not the longest-lasting fragrance, but the scent is so perfect for hot days that I don't mind reapplying. If you're looking for something light but distinctive, this is definitely worth trying!",
       likes: 245,
       occasion: "casual",
-      photos: [],
+      // Single photo instead of photos array
+      photo:
+        "https://images.unsplash.com/photo-1622618991746-fe6004db3a47?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.0.3",
       tags: ["fresh", "summer", "citrus", "light", "everyday"],
       notes: ["Sicilian lemon", "Apple", "Cedar", "Bamboo", "White rose"],
       accords: ["Citrus", "Woody", "Fresh"],
@@ -251,9 +257,13 @@ const samplePosts = [
       name: "Oud Wood",
       brand: "Tom Ford",
       category: "Woody/Oriental",
+      description:
+        "Tom Ford's Oud Wood is a masterpiece of modern perfumery. The first time I wore it to a formal dinner, I immediately felt more sophisticated and confident. The blend of rare oud wood with rosewood and cardamom creates a warm, mysterious aura that's perfect for evening events. Though quite expensive, a little goes a long way, and the compliments make it worth every penny. I particularly love wearing this during fall and winter months when the woody notes seem to shine even more. Definitely a signature-worthy scent for those who appreciate luxury fragrances.",
       likes: 384,
       occasion: "formal",
-      photos: [],
+      // Single photo instead of photos array
+      photo:
+        "https://images.unsplash.com/photo-1594035910387-fea47794261f?q=80&w=1480&auto=format&fit=crop&ixlib=rb-4.0.3",
       tags: ["oud", "luxury", "woody", "spicy", "sophisticated"],
       notes: ["Oud wood", "Rosewood", "Chinese pepper", "Amber", "Vanilla"],
       accords: ["Woody", "Oud", "Spicy", "Warm"],
@@ -299,9 +309,13 @@ const samplePosts = [
       name: "Aventus",
       brand: "Creed",
       category: "Fruity/Chypre",
+      description:
+        "Creed Aventus has been my special occasion fragrance for years now. From my wedding day to important business meetings, this scent never fails to make an impression. The opening blast of pineapple balanced with smoky birch creates a unique contrast that evolves beautifully throughout the day. While batch variations exist, I've found the core DNA remains consistent. Yes, it comes with a hefty price tag, but the confidence it gives me and the memories associated with it make Aventus worth the investment. A true modern classic that deserves its legendary status.",
       likes: 512,
       occasion: "special",
-      photos: [],
+      // Single photo instead of photos array
+      photo:
+        "https://images.unsplash.com/photo-1523293182086-7651a899d37f?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3",
       tags: ["pineapple", "smoky", "fresh", "fruity", "niche"],
       notes: ["Pineapple", "Bergamot", "Birch", "Ambergris", "Musk"],
       accords: ["Fruity", "Smoky", "Fresh", "Woody"],

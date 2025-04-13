@@ -1,7 +1,7 @@
 /** @format */
 "use client";
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 import {
   Heart,
@@ -19,6 +19,9 @@ import {
   ArrowUp,
   ArrowDown,
   Leaf,
+  AlignLeft,
+  Search,
+  ExternalLink,
 } from "lucide-react";
 
 import LoadingOverlay from "../post/LoadingOverlay";
@@ -28,6 +31,7 @@ import CollapsibleSection from "./CollapsibileSection";
 import SeasonIndicator from "./SeasonIndicator";
 import DayNightIndicator from "./DayNightIndicator";
 import CommentsSection from "./CommentSection";
+import PhotoModal from "./PhotoModal";
 
 // Enhanced detection functions for "Not specified" values
 
@@ -194,6 +198,9 @@ export default function FragrancePost({
   const [likeCount, setLikeCount] = useState(post.fragrance.likes);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  // State for photo modal
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
 
   const ratingIcons = [<Wind />, <Clock4 />, <SprayCan />, <Gem />];
   // Map of occasion IDs to emoji and text
@@ -218,6 +225,13 @@ export default function FragrancePost({
       setLikeCount(likeCount + 1);
     }
     setLiked(!liked);
+  };
+
+  // Function to truncate text with "Show more" option
+  const truncateText = (text, maxLength = 150) => {
+    if (!text) return null;
+    if (text.length <= maxLength || showFullDescription) return text;
+    return text.substring(0, maxLength) + "...";
   };
 
   // Post action handlers
@@ -264,6 +278,12 @@ export default function FragrancePost({
     }
   };
 
+  // Open photo modal
+  const openPhotoModal = (e) => {
+    e.stopPropagation();
+    setIsPhotoModalOpen(true);
+  };
+
   return (
     <div className="bg-zinc-800 rounded-lg overflow-hidden shadow-md border border-zinc-700/70 relative">
       <LoadingOverlay
@@ -271,6 +291,15 @@ export default function FragrancePost({
         message={loadingAction}
         subMessage="Please wait a moment..."
       />
+
+      {/* Photo Modal Component */}
+      <PhotoModal
+        isOpen={isPhotoModalOpen}
+        onClose={() => setIsPhotoModalOpen(false)}
+        photoUrl={post.fragrance.photo}
+        fragranceName={`${post.fragrance.brand} ${post.fragrance.name}`}
+      />
+
       {/* User info header */}
       <div className="p-3 flex items-center justify-between border-b border-zinc-700/60">
         <div className="flex items-center">
@@ -320,6 +349,23 @@ export default function FragrancePost({
           </div>
         </div>
 
+        {/* Description section */}
+        {post.fragrance.description && (
+          <div className="mt-4 bg-zinc-700/20 p-4 rounded-lg border border-zinc-700/40">
+            <p className="text-zinc-300 text-sm leading-relaxed">
+              {truncateText(post.fragrance.description)}
+            </p>
+            {post.fragrance.description.length > 150 && (
+              <button
+                onClick={() => setShowFullDescription(!showFullDescription)}
+                className="text-orange-400 hover:text-orange-300 text-xs mt-1 font-medium cursor-pointer inline-flex items-center"
+              >
+                {showFullDescription ? "Show less" : "Show more"}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Occasion badge */}
         {post.fragrance.occasion && occasions[post.fragrance.occasion] ? (
           <div className="mt-2 inline-flex items-center px-2 py-1 rounded-md bg-zinc-700/70 text-sm">
@@ -336,19 +382,28 @@ export default function FragrancePost({
           </div>
         )}
 
-        {/* Images would go here */}
-        {post.fragrance.photos && post.fragrance.photos.length > 0 ? (
-          <div className="mt-3 flex gap-1 overflow-x-auto pb-2">
-            {post.fragrance.photos.map((photo, index) => (
+        {/* Single Photo Display - with click to expand */}
+        {post.fragrance.photo && (
+          <div className="mt-4 relative">
+            <div
+              className="w-full rounded-lg overflow-hidden cursor-pointer relative group"
+              onClick={openPhotoModal}
+            >
               <img
-                key={index}
-                src={photo}
+                src={post.fragrance.photo}
                 alt={post.fragrance.name}
-                className="h-64 rounded-md object-cover"
+                className="w-full h-auto max-h-96 object-contain bg-zinc-900/30 rounded-lg border border-zinc-700/50"
               />
-            ))}
+
+              {/* Overlay with zoom icon on hover */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                <div className="bg-zinc-800/70 p-2 rounded-full">
+                  <Search className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </div>
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Tags section - always visible */}
@@ -476,7 +531,7 @@ export default function FragrancePost({
                 .map(([key, value], index) => (
                   <div
                     key={key}
-                    className="flex items-center justify-between  shadow px-3 rounded-md bg-orange-500/10 py-2 text-orange-200"
+                    className="flex items-center justify-between shadow px-3 rounded-md bg-orange-500/10 py-2 text-orange-200"
                   >
                     <span className="capitalize flex items-center gap-1 md:gap-2 text-xs md:text-base">
                       <span className="text-orange-200 scale-90 md:scale-100">

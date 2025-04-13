@@ -14,12 +14,12 @@ import {
   Moon,
   Image,
   X,
+  AlignLeft,
 } from "lucide-react";
 
-// Import sub-components - use the updated versions
 import BasicInfo from "./BasicInfo";
 import TagsInput from "./TagsInput";
-import NotesSelect from "./NotesSelect"; // Renamed from NotesInput
+import NotesSelect from "./NotesSelect";
 import AccordsSelect from "./AccordsSelect";
 import RatingSliders from "./RatingSliders";
 import SeasonSliders from "./SeasonSliders";
@@ -33,6 +33,7 @@ export default function PostForm({ onSubmit }) {
     name: "",
     brand: "",
     category: "",
+    description: "", // Added description field
     tags: [],
     notes: [],
     accords: [],
@@ -188,6 +189,7 @@ export default function PostForm({ onSubmit }) {
       case "name":
       case "brand":
       case "category":
+      case "description":
         // Update basicInfo completion status
         const updatedBasicInfo = {
           ...formData,
@@ -279,6 +281,7 @@ export default function PostForm({ onSubmit }) {
   // Check if form has any content beyond basic info
   const hasAdditionalContent = () => {
     return (
+      formData.description ||
       formData.tags.length > 0 ||
       formData.notes.length > 0 ||
       formData.accords.length > 0 ||
@@ -293,6 +296,12 @@ export default function PostForm({ onSubmit }) {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
     exit: { opacity: 0, y: -20, transition: { duration: 0.2 } },
+  };
+
+  // Function to truncate text for the summary view
+  const truncateText = (text, maxLength = 100) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
   };
 
   return (
@@ -317,6 +326,7 @@ export default function PostForm({ onSubmit }) {
               name={formData.name}
               brand={formData.brand}
               category={formData.category}
+              description={formData.description}
               updateFormData={updateFormData}
             />
           </div>
@@ -453,6 +463,19 @@ export default function PostForm({ onSubmit }) {
                 exit="exit"
                 className="mt-2 p-3 bg-zinc-800/80 rounded-lg border border-zinc-700"
               >
+                {/* Description Summary */}
+                {formData.description && (
+                  <div className="mb-3 p-2 bg-zinc-800/70 border border-zinc-700/50 rounded-md">
+                    <div className="flex items-center text-zinc-300 mb-1 font-medium">
+                      <AlignLeft size={12} className="mr-1 text-orange-400" />
+                      <span className="truncate">Description</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 line-clamp-2">
+                      {truncateText(formData.description)}
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {/* Tags */}
                   {formData.tags.length > 0 && (

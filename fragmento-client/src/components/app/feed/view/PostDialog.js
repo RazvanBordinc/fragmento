@@ -24,6 +24,12 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
       // In a real app, you would replace this with an actual API call
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
+      // Create the photo URL if photo exists
+      let photoUrl = null;
+      if (formData.photos.length > 0) {
+        photoUrl = URL.createObjectURL(formData.photos[0]);
+      }
+
       // Create a new post object from the form data
       const newPost = {
         id: `post-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -38,9 +44,11 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
           name: formData.name,
           brand: formData.brand,
           category: formData.category,
+          description: formData.description,
           likes: 0,
           occasion: formData.occasion,
-          photos: formData.photos.map((photo) => URL.createObjectURL(photo)),
+          // Include photo only if one exists
+          photo: photoUrl,
           tags: formData.tags,
           notes: formData.notes,
           accords: formData.accords,
@@ -61,7 +69,6 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
         },
         comments: [],
       };
-      console.log("newpost", newPost);
 
       // Call the onPostCreated callback with the new post
       onPostCreated(newPost);
@@ -99,6 +106,7 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
           initial="hidden"
           animate="visible"
           exit="hidden"
+          onClick={handleClose}
         >
           <motion.div
             className="w-full max-w-3xl mx-auto rounded-xl overflow-hidden"
