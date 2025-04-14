@@ -2,8 +2,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 export default function AuthForm() {
+  const router = useRouter();
+
   // Form mode states
   const [formMode, setFormMode] = useState("selection"); // "selection", "login", "register"
   const [currentStep, setCurrentStep] = useState(0);
@@ -20,17 +23,17 @@ export default function AuthForm() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formCompleted, setFormCompleted] = useState(false);
+  const [apiError, setApiError] = useState(null);
 
   // Form fields configuration - defines the order and validation for each step
   const loginFields = [
     {
-      name: "email",
-      label: "What's your email?",
-      type: "email",
-      placeholder: "your@email.com",
+      name: "username", // Changed from email to username for login as per AuthController.cs
+      label: "What's your username?",
+      type: "text",
+      placeholder: "your_username",
       validate: (value) => {
-        if (!value) return "Email is required";
-        if (!/\S+@\S+\.\S+/.test(value)) return "Email is invalid";
+        if (!value) return "Username is required";
         return "";
       },
     },
@@ -126,6 +129,7 @@ export default function AuthForm() {
     setFormMode("login");
     setCurrentStep(0);
     setErrors({});
+    setApiError(null);
     setFormData({
       email: "",
       password: "",
@@ -139,6 +143,7 @@ export default function AuthForm() {
     setFormMode("register");
     setCurrentStep(0);
     setErrors({});
+    setApiError(null);
     setFormData({
       email: "",
       password: "",
@@ -152,6 +157,7 @@ export default function AuthForm() {
     setFormMode("selection");
     setCurrentStep(0);
     setFormCompleted(false);
+    setApiError(null);
   };
 
   // Validate current field and move to next if valid
@@ -189,16 +195,82 @@ export default function AuthForm() {
     }
   };
 
-  // Handle form submission
-  const handleSubmit = () => {
-    setIsSubmitting(true);
+  // API URL
+  const API_URL = "http://localhost:5293"; // Using the HTTP port from launchSettings.json
 
-    // Mock API call
-    setTimeout(() => {
-      console.log("Form submitted:", formData);
+  // Handle form submission
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setApiError(null);
+
+    try {
+      if (formMode === "login") {
+        // Login API call
+        const response = await fetch(`${API_URL}/api/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: formData.username,
+            password: formData.password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Login failed");
+        }
+
+        // Store token in localStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("refreshToken", data.refreshToken);
+        localStorage.setItem("tokenExpiration", data.tokenExpiration);
+        localStorage.setItem("userId", data.id);
+        localStorage.setItem("username", data.username);
+        localStorage.setItem("email", data.email);
+
+        // Redirect to app page
+        router.push("/app");
+      } else {
+        // Register API call
+        const response = await fetch(`${API_URL}/api/auth/register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: formData.username,
+            email: formData.email,
+            password: formData.password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Registration failed");
+        }
+
+        // Store token in localStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("refreshToken", data.refreshToken);
+        localStorage.setItem("tokenExpiration", data.tokenExpiration);
+        localStorage.setItem("userId", data.id);
+        localStorage.setItem("username", data.username);
+        localStorage.setItem("email", data.email);
+
+        // Redirect to app page
+        router.push("/app");
+      }
+    } catch (error) {
+      console.error("Auth error:", error);
+      setApiError(error.message || "Authentication failed. Please try again.");
+      setFormCompleted(false);
+    } finally {
       setIsSubmitting(false);
-      // In a real app, you would handle authentication here
-    }, 1500);
+    }
   };
 
   const containerVariants = {
@@ -369,6 +441,18 @@ export default function AuthForm() {
                   </div>
                 )}
 
+                {/* API Error Display */}
+                {apiError && (
+                  <motion.div
+                    variants={itemVariants}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg text-red-400 text-sm"
+                  >
+                    {apiError}
+                  </motion.div>
+                )}
+
                 <motion.button
                   variants={itemVariants}
                   type="button"
@@ -429,7 +513,7 @@ export default function AuthForm() {
               </form>
             </motion.div>
 
-            {formCompleted && (
+            {formCompleted && !apiError && isSubmitting && (
               <motion.div
                 variants={itemVariants}
                 initial={{ opacity: 0 }}
@@ -437,8 +521,8 @@ export default function AuthForm() {
                 className="text-center mt-4 text-green-400"
               >
                 {formMode === "login"
-                  ? "Login successful!"
-                  : "Account created successfully!"}
+                  ? "Logging in..."
+                  : "Creating your account..."}
               </motion.div>
             )}
           </motion.div>

@@ -1,534 +1,283 @@
 /** @format */
+
 "use client";
+
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  User,
-  LogOut,
-  Trash2,
-  ChevronRight,
-  AlertTriangle,
-  X,
-  Lock,
-} from "lucide-react";
-import Link from "next/link";
+import { motion } from "framer-motion";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { changePassword, logoutUser } from "@/lib/auth/AuthService";
 import { useRouter } from "next/navigation";
-import ToastNotification from "../feed/view/ToastNotification";
-import LoadingOverlay from "../feed/post/LoadingOverlay";
 
 export default function AccountSettings() {
+  const { user, logout } = useAuth();
   const router = useRouter();
 
-  // State variables
-  const [activeSection, setActiveSection] = useState("account");
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("");
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [toast, setToast] = useState({
-    visible: false,
-    message: "",
-    type: "success",
-  });
-
-  // Password change form
-  const [passwordForm, setPasswordForm] = useState({
+  const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
-  // Password errors
-  const [passwordErrors, setPasswordErrors] = useState({});
-
-  const handlePasswordChange = (e) => {
+  // Handle input changes
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setPasswordForm((prev) => ({
-      ...prev,
+    setPasswordData({
+      ...passwordData,
       [name]: value,
-    }));
+    });
 
-    // Clear errors when typing
-    if (passwordErrors[name]) {
-      setPasswordErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
+    // Clear error when typing
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: null,
+      });
     }
   };
 
-  // Validate password form
-  const validatePasswordForm = () => {
-    const errors = {};
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
 
-    if (!passwordForm.currentPassword) {
-      errors.currentPassword = "Current password is required";
+    if (!passwordData.currentPassword) {
+      newErrors.currentPassword = "Current password is required";
     }
 
-    if (!passwordForm.newPassword) {
-      errors.newPassword = "New password is required";
-    } else if (passwordForm.newPassword.length < 8) {
-      errors.newPassword = "Password must be at least 8 characters";
+    if (!passwordData.newPassword) {
+      newErrors.newPassword = "New password is required";
+    } else if (passwordData.newPassword.length < 8) {
+      newErrors.newPassword = "Password must be at least 8 characters";
     }
 
-    if (!passwordForm.confirmPassword) {
-      errors.confirmPassword = "Please confirm your password";
-    } else if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      errors.confirmPassword = "Passwords do not match";
+    if (!passwordData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password";
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
     }
 
-    setPasswordErrors(errors);
-    return Object.keys(errors).length === 0;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  // Handle password form submission
-  const handlePasswordSubmit = async (e) => {
+  // Handle form submission
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validatePasswordForm()) {
+    if (!validateForm()) {
       return;
     }
 
-    setIsLoading(true);
-    setLoadingMessage("Updating password...");
+    setIsSubmitting(true);
+    setSuccessMessage("");
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      // Call change password API
+      await changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
 
-      // Reset form
-      setPasswordForm({
+      // Clear form and show success message
+      setPasswordData({
         currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       });
-
-      // Show success message
-      setToast({
-        visible: true,
-        message: "Password updated successfully",
-        type: "success",
-      });
+      setSuccessMessage("Password changed successfully");
     } catch (error) {
-      console.error("Error updating password:", error);
-      setToast({
-        visible: true,
-        message: "Failed to update password. Please try again.",
-        type: "error",
+      console.error("Password change error:", error);
+      setErrors({
+        form: error.message || "Failed to change password. Please try again",
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
-  };
-
-  // Handle delete account
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== "DELETE") {
-      setToast({
-        visible: true,
-        message: "Please type DELETE to confirm account deletion",
-        type: "error",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    setLoadingMessage("Deleting account...");
-
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Close modal
-      setIsDeleteModalOpen(false);
-
-      // Redirect to landing page
-      router.push("/");
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      setToast({
-        visible: true,
-        message: "Failed to delete account. Please try again.",
-        type: "error",
-      });
-      setIsLoading(false);
-    }
-  };
-
-  // Handle toggle changes
-  const handleToggleChange = (setting) => {
-    setSettings((prev) => ({
-      ...prev,
-      [setting]: !prev[setting],
-    }));
-
-    // Show toast notification
-    setToast({
-      visible: true,
-      message: "Setting updated",
-      type: "success",
-    });
   };
 
   // Handle logout
   const handleLogout = async () => {
-    setIsLoading(true);
-    setLoadingMessage("Logging out...");
-
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Get refresh token from localStorage
+      const refreshToken = localStorage.getItem("refreshToken");
 
-      // Redirect to landing page
+      // Call logout API
+      await logoutUser(refreshToken);
+
+      // Update auth context
+      logout();
+
+      // Redirect to login page
       router.push("/");
     } catch (error) {
-      console.error("Error logging out:", error);
-      setToast({
-        visible: true,
-        message: "Failed to logout. Please try again.",
-        type: "error",
-      });
-      setIsLoading(false);
+      console.error("Logout error:", error);
+      // Logout anyway
+      logout();
+      router.push("/");
     }
   };
 
-  // Close toast
-  const closeToast = () => {
-    setToast((prev) => ({
-      ...prev,
-      visible: false,
-    }));
-  };
-
-  // Sections config
-  const sections = [
-    {
-      id: "account",
-      label: "Account Information",
-      icon: <User size={18} />,
-    },
-    {
-      id: "password",
-      label: "Password",
-      icon: <Lock size={18} />,
-    },
-  ];
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-zinc-400">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white pt-6 pb-12">
-      <LoadingOverlay isLoading={isLoading} message={loadingMessage} />
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-zinc-800 rounded-lg shadow-lg border border-zinc-700 overflow-hidden">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold text-white">Profile Settings</h1>
+            <motion.button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Logout
+            </motion.button>
+          </div>
 
-      <ToastNotification
-        message={toast.message}
-        type={toast.type}
-        isVisible={toast.visible}
-        onClose={closeToast}
-      />
-
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white mb-2">
-            Account Settings
-          </h1>
-          <p className="text-zinc-400">
-            Manage your account preferences, privacy, and security
-          </p>
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="w-full md:w-64 bg-zinc-800 rounded-lg border border-zinc-700 overflow-hidden">
-            <nav className="divide-y divide-zinc-700">
-              {sections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => setActiveSection(section.id)}
-                  className={`flex items-center justify-between w-full px-4 py-3 cursor-pointer transition-colors ${
-                    activeSection === section.id
-                      ? "bg-zinc-700 text-orange-400"
-                      : "text-zinc-300 hover:bg-zinc-700/70"
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <span className="mr-3">{section.icon}</span>
-                    <span>{section.label}</span>
-                  </div>
-                  <ChevronRight
-                    size={16}
-                    className={
-                      activeSection === section.id
-                        ? "text-orange-400"
-                        : "text-zinc-500"
-                    }
-                  />
-                </button>
-              ))}
-            </nav>
-
-            {/* Logout and Delete Account */}
-            <div className="p-4 bg-zinc-800 border-t border-zinc-700">
-              <button
-                onClick={handleLogout}
-                className="flex items-center w-full px-3 py-2 rounded-lg text-red-400 hover:bg-zinc-700 transition-colors cursor-pointer mb-2"
-              >
-                <LogOut size={18} className="mr-3" />
-                <span>Log Out</span>
-              </button>
-
-              <button
-                onClick={() => setIsDeleteModalOpen(true)}
-                className="flex items-center w-full px-3 py-2 rounded-lg text-red-400 hover:bg-zinc-700 transition-colors cursor-pointer"
-              >
-                <Trash2 size={18} className="mr-3" />
-                <span>Delete Account</span>
-              </button>
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Account Information
+            </h2>
+            <div className="grid gap-4">
+              <div>
+                <p className="text-zinc-400 text-sm">Username</p>
+                <p className="text-white font-medium">{user.username}</p>
+              </div>
+              <div>
+                <p className="text-zinc-400 text-sm">Email</p>
+                <p className="text-white font-medium">{user.email}</p>
+              </div>
             </div>
           </div>
 
-          {/* Main content */}
-          <div className="flex-1">
-            <AnimatePresence mode="wait">
-              {activeSection === "account" && (
-                <motion.div
-                  key="account-section"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-zinc-800 rounded-lg border border-zinc-700 p-5"
-                >
-                  <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-                    <User size={20} className="mr-2 text-orange-400" />
-                    Account Information
-                  </h2>
-
-                  <div className="space-y-6">
-                    <div>
-                      <p className="text-zinc-400 text-sm mb-1">Username</p>
-                      <p className="text-white font-medium">fragrancefan</p>
-                    </div>
-
-                    <div>
-                      <p className="text-zinc-400 text-sm mb-1">
-                        Email Address
-                      </p>
-                      <p className="text-white font-medium">user@example.com</p>
-                    </div>
-
-                    <div>
-                      <p className="text-zinc-400 text-sm mb-1">
-                        Account Created
-                      </p>
-                      <p className="text-white font-medium">January 15, 2023</p>
-                    </div>
-
-                    <div>
-                      <Link
-                        href="/app/profile"
-                        className="text-orange-400 hover:text-orange-300 cursor-pointer transition-colors flex items-center"
-                      >
-                        <span>Edit Profile</span>
-                        <ChevronRight size={16} className="ml-1" />
-                      </Link>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {activeSection === "password" && (
-                <motion.div
-                  key="password-section"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-zinc-800 rounded-lg border border-zinc-700 p-5"
-                >
-                  <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-                    <Lock size={20} className="mr-2 text-orange-400" />
-                    Change Password
-                  </h2>
-
-                  <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                    <div>
-                      <label
-                        htmlFor="currentPassword"
-                        className="block text-zinc-400 text-sm mb-1"
-                      >
-                        Current Password
-                      </label>
-                      <input
-                        type="password"
-                        id="currentPassword"
-                        name="currentPassword"
-                        value={passwordForm.currentPassword}
-                        onChange={handlePasswordChange}
-                        className={`w-full px-4 py-2 rounded-lg bg-zinc-700 text-white border ${
-                          passwordErrors.currentPassword
-                            ? "border-red-500"
-                            : "border-zinc-600"
-                        } focus:border-orange-500 focus:outline-none`}
-                      />
-                      {passwordErrors.currentPassword && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {passwordErrors.currentPassword}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="newPassword"
-                        className="block text-zinc-400 text-sm mb-1"
-                      >
-                        New Password
-                      </label>
-                      <input
-                        type="password"
-                        id="newPassword"
-                        name="newPassword"
-                        value={passwordForm.newPassword}
-                        onChange={handlePasswordChange}
-                        className={`w-full px-4 py-2 rounded-lg bg-zinc-700 text-white border ${
-                          passwordErrors.newPassword
-                            ? "border-red-500"
-                            : "border-zinc-600"
-                        } focus:border-orange-500 focus:outline-none`}
-                      />
-                      {passwordErrors.newPassword && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {passwordErrors.newPassword}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="confirmPassword"
-                        className="block text-zinc-400 text-sm mb-1"
-                      >
-                        Confirm New Password
-                      </label>
-                      <input
-                        type="password"
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        value={passwordForm.confirmPassword}
-                        onChange={handlePasswordChange}
-                        className={`w-full px-4 py-2 rounded-lg bg-zinc-700 text-white border ${
-                          passwordErrors.confirmPassword
-                            ? "border-red-500"
-                            : "border-zinc-600"
-                        } focus:border-orange-500 focus:outline-none`}
-                      />
-                      {passwordErrors.confirmPassword && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {passwordErrors.confirmPassword}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-6">
-                      <motion.button
-                        type="submit"
-                        className="px-4 py-2 bg-orange-600 text-white rounded-lg cursor-pointer hover:bg-orange-500 transition-colors"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        Update Password
-                      </motion.button>
-                    </div>
-                  </form>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-
-      {/* Delete Account Confirmation Modal */}
-      <AnimatePresence>
-        {isDeleteModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setIsDeleteModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ type: "spring", damping: 25, stiffness: 500 }}
-              className="w-full max-w-md bg-zinc-900 rounded-xl border border-red-800/50 overflow-hidden shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white flex items-center">
-                    <AlertTriangle className="text-red-500 mr-2" size={24} />
-                    Delete Account
-                  </h3>
-                  <button
-                    onClick={() => setIsDeleteModalOpen(false)}
-                    className="text-zinc-400 hover:text-white cursor-pointer"
+          <div>
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Change Password
+            </h2>
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-4">
+                {/* Current Password */}
+                <div>
+                  <label
+                    htmlFor="currentPassword"
+                    className="block text-sm font-medium text-zinc-300 mb-1"
                   >
-                    <X size={24} />
-                  </button>
-                </div>
-
-                <div className="text-zinc-300 mb-6 space-y-4">
-                  <p>
-                    Are you sure you want to delete your account? This action is
-                    permanent and cannot be undone.
-                  </p>
-                  <p>You will lose all of your data, including:</p>
-                  <ul className="list-disc ml-5 space-y-1">
-                    <li>Your profile</li>
-                    <li>All posts and comments</li>
-                    <li>Collections and saved items</li>
-                    <li>Follows and followers</li>
-                  </ul>
-
-                  <div className="bg-red-900/20 border border-red-800/40 rounded-lg p-4 mt-4">
-                    <p className="text-red-400 font-medium">
-                      Type DELETE to confirm:
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    id="currentPassword"
+                    name="currentPassword"
+                    value={passwordData.currentPassword}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 bg-zinc-700 border ${
+                      errors.currentPassword
+                        ? "border-red-500"
+                        : "border-zinc-600"
+                    } rounded-lg text-white focus:outline-none focus:border-orange-500`}
+                  />
+                  {errors.currentPassword && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.currentPassword}
                     </p>
-                    <input
-                      type="text"
-                      value={deleteConfirmText}
-                      onChange={(e) => setDeleteConfirmText(e.target.value)}
-                      className="w-full mt-2 px-3 py-2 bg-zinc-800 border border-red-800/30 rounded text-white focus:outline-none focus:ring-1 focus:ring-red-500 cursor-pointer"
-                      placeholder="Type DELETE here"
-                    />
-                  </div>
+                  )}
                 </div>
 
-                <div className="flex justify-end gap-3">
-                  <motion.button
-                    onClick={() => setIsDeleteModalOpen(false)}
-                    className="px-4 py-2 bg-zinc-700 text-white rounded-lg cursor-pointer hover:bg-zinc-600"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                {/* New Password */}
+                <div>
+                  <label
+                    htmlFor="newPassword"
+                    className="block text-sm font-medium text-zinc-300 mb-1"
                   >
-                    Cancel
-                  </motion.button>
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    id="newPassword"
+                    name="newPassword"
+                    value={passwordData.newPassword}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 bg-zinc-700 border ${
+                      errors.newPassword ? "border-red-500" : "border-zinc-600"
+                    } rounded-lg text-white focus:outline-none focus:border-orange-500`}
+                  />
+                  {errors.newPassword && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.newPassword}
+                    </p>
+                  )}
+                </div>
 
-                  <motion.button
-                    onClick={handleDeleteAccount}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg cursor-pointer hover:bg-red-500"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                {/* Confirm New Password */}
+                <div>
+                  <label
+                    htmlFor="confirmPassword"
+                    className="block text-sm font-medium text-zinc-300 mb-1"
                   >
-                    Delete Account
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    value={passwordData.confirmPassword}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 bg-zinc-700 border ${
+                      errors.confirmPassword
+                        ? "border-red-500"
+                        : "border-zinc-600"
+                    } rounded-lg text-white focus:outline-none focus:border-orange-500`}
+                  />
+                  {errors.confirmPassword && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.confirmPassword}
+                    </p>
+                  )}
+                </div>
+
+                {/* Form error */}
+                {errors.form && (
+                  <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+                    <p className="text-sm text-red-500">{errors.form}</p>
+                  </div>
+                )}
+
+                {/* Success message */}
+                {successMessage && (
+                  <div className="p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
+                    <p className="text-sm text-green-500">{successMessage}</p>
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <div>
+                  <motion.button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg disabled:bg-orange-700 disabled:cursor-not-allowed"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {isSubmitting ? "Changing Password..." : "Change Password"}
                   </motion.button>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
