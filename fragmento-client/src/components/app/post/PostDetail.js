@@ -4,15 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Loader,
-  AlertTriangle,
-  Share2,
-  Flag,
-  MessageSquare,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, Loader, AlertTriangle, Share2, Flag } from "lucide-react";
 
 import FragrancePost from "../feed/view/FragrancePost";
 
@@ -23,7 +15,6 @@ export default function PostDetail({ postId }) {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [relatedPosts, setRelatedPosts] = useState([]);
 
   // Current user information (for commenting, etc.)
   const [currentUser, setCurrentUser] = useState({
@@ -48,20 +39,6 @@ export default function PostDetail({ postId }) {
 
         if (foundPost) {
           setPost(foundPost);
-
-          // Find related posts (same brand or similar notes)
-          const related = samplePosts
-            .filter(
-              (p) =>
-                p.id !== postId &&
-                (p.fragrance.brand === foundPost.fragrance.brand ||
-                  p.fragrance.accords.some((accord) =>
-                    foundPost.fragrance.accords.includes(accord)
-                  ))
-            )
-            .slice(0, 2); // Limit to 2 related posts
-
-          setRelatedPosts(related);
         } else {
           setError("Post not found");
         }
@@ -97,7 +74,7 @@ export default function PostDetail({ postId }) {
   };
 
   // Handle reporting
-  const handleReport = () => {
+  const handleReport = async () => {
     // In a real app, you'd open a report modal or navigate to report page
     alert("Report feature would open here");
   };
@@ -163,68 +140,10 @@ export default function PostDetail({ postId }) {
             </div>
           ) : (
             <div>
-              {/* Post content */}
+              {/* Post content - only showing the specific post */}
               <div className="mb-8">
                 <FragrancePost post={post} currentUser={currentUser} />
               </div>
-
-              {/* Post metadata */}
-              <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700 mb-8">
-                <h2 className="text-white font-medium mb-3 flex items-center">
-                  <MessageSquare size={18} className="text-orange-500 mr-2" />
-                  Post Information
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center text-zinc-300 text-sm">
-                    <span className="text-zinc-500 mr-2">Posted by:</span>
-                    <Link
-                      href={`/app/${post.user.username}`}
-                      className="text-orange-400 hover:underline cursor-pointer"
-                    >
-                      @{post.user.username}
-                    </Link>
-                  </div>
-                  <div className="flex items-center text-zinc-300 text-sm">
-                    <span className="text-zinc-500 mr-2">Posted:</span>
-                    <span>{post.timestamp}</span>
-                  </div>
-                  <div className="flex items-center text-zinc-300 text-sm">
-                    <span className="text-zinc-500 mr-2">Comments:</span>
-                    <span>{post.comments ? post.comments.length : 0}</span>
-                  </div>
-                  <div className="flex items-center text-zinc-300 text-sm">
-                    <span className="text-zinc-500 mr-2">Likes:</span>
-                    <span>{post.fragrance.likes}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Related posts */}
-              {relatedPosts.length > 0 && (
-                <div>
-                  <h2 className="text-white font-medium mb-4 flex items-center">
-                    <Users size={18} className="text-orange-500 mr-2" />
-                    Related Posts
-                  </h2>
-
-                  <div className="space-y-6">
-                    {relatedPosts.map((relatedPost) => (
-                      <motion.div
-                        key={relatedPost.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <FragrancePost
-                          post={relatedPost}
-                          currentUser={currentUser}
-                        />
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
