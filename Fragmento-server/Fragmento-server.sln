@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fragmento-server", "Fragmento-server.csproj", "{B0D9CBF3-0F30-46B1-9D01-3FF55547DED2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B0D9CBF3-0F30-46B1-9D01-3FF55547DED2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0D9CBF3-0F30-46B1-9D01-3FF55547DED2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0D9CBF3-0F30-46B1-9D01-3FF55547DED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0D9CBF3-0F30-46B1-9D01-3FF55547DED2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {70EE30D7-90CF-4FDC-8099-68285EFAEA81}
+	EndGlobalSection
+EndGlobal

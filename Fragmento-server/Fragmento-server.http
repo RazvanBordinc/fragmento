@@ -1,0 +1,6 @@
+@Fragmento_server_HostAddress = http://localhost:5293
+
+GET {{Fragmento_server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
