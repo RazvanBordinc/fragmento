@@ -21,9 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Data\Repository\" />
-    <Folder Include="Helpers\Extensions\" />
-    <Folder Include="Helpers\Utils\" />
     <Folder Include="Models\Validation\" />
     <Folder Include="Middlewares\" />
   </ItemGroup>

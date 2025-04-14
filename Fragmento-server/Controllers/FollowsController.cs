@@ -7,6 +7,7 @@ using Fragmento_server.Models.Entities;
 using Fragmento_server.Models.Entities.Fragmento_server.Models.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -28,6 +29,7 @@ namespace Fragmento_server.Controllers
 
         // POST: api/follows/{username}
         [HttpPost("{username}")]
+        [EnableRateLimiting("default")]
         public async Task<IActionResult> FollowUser(string username)
         {
             try
@@ -105,6 +107,7 @@ namespace Fragmento_server.Controllers
 
         // DELETE: api/follows/{username}
         [HttpDelete("{username}")]
+        [EnableRateLimiting("default")]
         public async Task<IActionResult> UnfollowUser(string username)
         {
             try
@@ -153,6 +156,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/follows/check/{username}
         [HttpGet("check/{username}")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<FollowCheckResponse>> CheckFollow(string username)
         {
             try
@@ -194,6 +198,7 @@ namespace Fragmento_server.Controllers
         // GET: api/follows/followers/count/{username}
         [HttpGet("followers/count/{username}")]
         [AllowAnonymous] // This endpoint can be accessed without auth
+        [EnableRateLimiting("follows")]
         public async Task<ActionResult<int>> GetFollowersCount(string username)
         {
             try
@@ -224,6 +229,7 @@ namespace Fragmento_server.Controllers
         // GET: api/follows/following/count/{username}
         [HttpGet("following/count/{username}")]
         [AllowAnonymous] // This endpoint can be accessed without auth
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<int>> GetFollowingCount(string username)
         {
             try

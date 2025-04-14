@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Fragmento_server.Services.Interfaces;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Fragmento_server.Controllers
 {
@@ -36,6 +37,7 @@ namespace Fragmento_server.Controllers
 
         // POST: api/auth/register
         [HttpPost("register")]
+        [EnableRateLimiting("auth")]
         public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
         {
             // Validate request
@@ -106,6 +108,7 @@ namespace Fragmento_server.Controllers
 
         // POST: api/auth/login
         [HttpPost("login")]
+        [EnableRateLimiting("auth")]
         public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
         {
             // Validate request
@@ -175,6 +178,7 @@ namespace Fragmento_server.Controllers
 
         // POST: api/auth/refresh
         [HttpPost("refresh")]
+        [EnableRateLimiting("auth")]
         public async Task<ActionResult<AuthResponse>> RefreshToken(RefreshTokenRequest request)
         {
             // Extract token from Authorization header
@@ -256,6 +260,7 @@ namespace Fragmento_server.Controllers
         // POST: api/auth/logout
         [HttpPost("logout")]
         [Authorize]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Logout(RefreshTokenRequest request)
         {
             // Get current user id from token
@@ -283,6 +288,7 @@ namespace Fragmento_server.Controllers
         // POST: api/auth/change-password
         [HttpPost("change-password")]
         [Authorize]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
         {
             // Validate request
@@ -336,55 +342,12 @@ namespace Fragmento_server.Controllers
             return Ok(new { message = "Password changed successfully" });
         }
 
-        // POST: api/auth/forgot-password
-        [HttpPost("forgot-password")]
-        public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
-        {
-            // Validate request
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
 
-            // Find user by email
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-            if (user == null)
-            {
-                // Don't reveal that the user does not exist
-                return Ok(new { message = "If your email is registered, you will receive a password reset link." });
-            }
-
-            // In a real application, you would:
-            // 1. Generate a password reset token
-            // 2. Store it securely with an expiration time
-            // 3. Send an email with a link containing the token
-
-            // For this implementation, we'll just acknowledge the request
-            return Ok(new { message = "If your email is registered, you will receive a password reset link." });
-        }
-
-        // POST: api/auth/reset-password
-        [HttpPost("reset-password")]
-        public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
-        {
-            // Validate request
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            // In a real application, you would:
-            // 1. Validate the reset token
-            // 2. Find the user associated with the token
-            // 3. Check if the token is still valid (not expired)
-
-            // For this implementation, we'll just acknowledge the request
-            return Ok(new { message = "Password has been reset successfully." });
-        }
 
         // GET: api/auth/validate
         [HttpGet("validate")]
         [Authorize]
+        [EnableRateLimiting("auth")]
         public IActionResult ValidateToken()
         {
             return Ok(new { isValid = true });

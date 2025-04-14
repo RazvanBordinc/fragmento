@@ -9,6 +9,7 @@ using Fragmento_server.Models.DTOs.Responses;
 using Fragmento_server.Models.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -32,6 +33,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/notifications
         [HttpGet]
+        [EnableRateLimiting("notifications")]
         public async Task<ActionResult<IEnumerable<NotificationResponse>>> GetNotifications(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20,
@@ -114,6 +116,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/notifications/count
         [HttpGet("count")]
+        [EnableRateLimiting("notifications")]
         public async Task<ActionResult<NotificationCountResponse>> GetNotificationCount()
         {
             // Get current user from token claims
@@ -150,6 +153,7 @@ namespace Fragmento_server.Controllers
 
         // PATCH: api/notifications/mark-read
         [HttpPatch("mark-read")]
+        [EnableRateLimiting("notifications")]
         public async Task<IActionResult> MarkNotificationsAsRead(MarkNotificationsReadRequest request)
         {
             if (request == null || request.NotificationIds == null || !request.NotificationIds.Any())
@@ -218,6 +222,7 @@ namespace Fragmento_server.Controllers
 
         // PATCH: api/notifications/mark-all-read
         [HttpPatch("mark-all-read")]
+        [EnableRateLimiting("notifications")]
         public async Task<IActionResult> MarkAllNotificationsAsRead()
         {
             // Get current user from token claims
@@ -262,6 +267,7 @@ namespace Fragmento_server.Controllers
 
         // DELETE: api/notifications/{id}
         [HttpDelete("{id}")]
+        [EnableRateLimiting("notifications")]
         public async Task<IActionResult> DeleteNotification(string id)
         {
             if (!Guid.TryParse(id, out Guid notificationId))
@@ -314,6 +320,7 @@ namespace Fragmento_server.Controllers
 
         // DELETE: api/notifications
         [HttpDelete]
+        [EnableRateLimiting("notifications")]
         public async Task<IActionResult> DeleteAllNotifications()
         {
             // Get current user from token claims

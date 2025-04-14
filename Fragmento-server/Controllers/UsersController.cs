@@ -10,6 +10,7 @@ using Fragmento_server.Models.DTOs.Responses;
 using Fragmento_server.Models.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fragmento_server.Controllers
@@ -28,6 +29,7 @@ namespace Fragmento_server.Controllers
         // GET: api/users
         [HttpGet]
         [Authorize]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<IEnumerable<UserBriefResponse>>> GetUsers()
         {
             var users = await _context.Users
@@ -45,6 +47,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/users/{username}
         [HttpGet("{username}")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<UserProfileResponse>> GetUserByUsername(string username)
         {
             var user = await _context.Users
@@ -135,6 +138,7 @@ namespace Fragmento_server.Controllers
         // GET: api/users/me
         [HttpGet("me")]
         [Authorize]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<UserProfileResponse>> GetCurrentUser()
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
@@ -204,6 +208,7 @@ namespace Fragmento_server.Controllers
         // PUT: api/users/me
         [HttpPut("me")]
         [Authorize]
+        [EnableRateLimiting("default")]
         public async Task<IActionResult> UpdateProfile(UpdateProfileRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
@@ -293,6 +298,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/users/{username}/posts
         [HttpGet("{username}/posts")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<IEnumerable<PostResponse>>> GetUserPosts(string username)
         {
             var user = await _context.Users
@@ -393,6 +399,7 @@ namespace Fragmento_server.Controllers
         // GET: api/users/{username}/saved
         [HttpGet("{username}/saved")]
         [Authorize]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<IEnumerable<PostResponse>>> GetUserSavedPosts(string username)
         {
             // Check if user is requesting their own saved posts
@@ -508,6 +515,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/users/{username}/followers
         [HttpGet("{username}/followers")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<IEnumerable<FollowResponse>>> GetFollowers(string username)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);

@@ -1,6 +1,7 @@
 using Fragmento_server.Data;
 using Fragmento_server.Services.Implementations;
 using Fragmento_server.Services.Interfaces;
+using Fragmento_server.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,9 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
+// Add Rate Limiting
+builder.Services.AddFragmentoRateLimiting();
 
 // Add Authentication
 builder.Services.AddAuthentication(options =>
@@ -94,7 +98,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger(); 
+    app.UseSwagger();
     app.UseSwaggerUI();
     app.UseDeveloperExceptionPage();
     app.MapOpenApi();
@@ -104,6 +108,9 @@ app.UseHttpsRedirection();
 
 // Use CORS
 app.UseCors("AllowFragmentoClient");
+
+// Use Rate limiting middleware
+app.UseRateLimiter();
 
 // Use Authentication & Authorization
 app.UseAuthentication();

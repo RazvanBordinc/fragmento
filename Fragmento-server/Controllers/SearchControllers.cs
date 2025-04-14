@@ -8,6 +8,7 @@ using Fragmento_server.Models.DTOs.Requests;
 using Fragmento_server.Models.DTOs.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -29,6 +30,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/search/users?query=abc
         [HttpGet("users")]
+        [EnableRateLimiting("search")]
         public async Task<ActionResult<SearchUsersResponse>> SearchUsers([FromQuery] SearchUsersRequest request)
         {
             if (!ModelState.IsValid)
@@ -109,6 +111,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/search/suggest?query=abc
         [HttpGet("suggest")]
+        [EnableRateLimiting("search")]
         public async Task<ActionResult<List<UserSearchResult>>> GetUserSuggestions([FromQuery] string query, [FromQuery] int limit = 5)
         {
             if (string.IsNullOrWhiteSpace(query) || query.Length < 2)

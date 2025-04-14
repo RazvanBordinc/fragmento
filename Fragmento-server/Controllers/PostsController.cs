@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Fragmento_server.Models.Entities.Fragmento_server.Models.Entities;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Fragmento_server.Controllers
 {
@@ -33,6 +34,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/posts
         [HttpGet]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<IEnumerable<PostResponse>>> GetPosts([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             try
@@ -110,6 +112,7 @@ namespace Fragmento_server.Controllers
         // GET: api/posts/feed
         [HttpGet("feed")]
         [Authorize]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<IEnumerable<PostResponse>>> GetFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             try
@@ -182,6 +185,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/posts/discover
         [HttpGet("discover")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<IEnumerable<PostResponse>>> GetDiscover([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             try
@@ -252,6 +256,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/posts/{id}
         [HttpGet("{id}")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<PostResponse>> GetPost(Guid id)
         {
             try
@@ -316,6 +321,7 @@ namespace Fragmento_server.Controllers
         // POST: api/posts
         [HttpPost]
         [Authorize]
+        [EnableRateLimiting("post_create")]
         public async Task<ActionResult<PostResponse>> CreatePost(CreatePostRequest request)
         {
             try
@@ -434,6 +440,7 @@ namespace Fragmento_server.Controllers
         // PUT: api/posts/{id}
         [HttpPut("{id}")]
         [Authorize]
+        [EnableRateLimiting("post_create")]
         public async Task<IActionResult> UpdatePost(Guid id, UpdatePostRequest request)
         {
             try
@@ -604,6 +611,7 @@ namespace Fragmento_server.Controllers
         // DELETE: api/posts/{id}
         [HttpDelete("{id}")]
         [Authorize]
+        [EnableRateLimiting("post_create")]
         public async Task<IActionResult> DeletePost(Guid id)
         {
             try
@@ -702,6 +710,7 @@ namespace Fragmento_server.Controllers
         // POST: api/posts/{id}/like
         [HttpPost("{id}/like")]
         [Authorize]
+        [EnableRateLimiting("likes")]
         public async Task<IActionResult> LikePost(Guid id)
         {
             try
@@ -776,6 +785,7 @@ namespace Fragmento_server.Controllers
         // DELETE: api/posts/{id}/like
         [HttpDelete("{id}/like")]
         [Authorize]
+        [EnableRateLimiting("likes")]
         public async Task<IActionResult> UnlikePost(Guid id)
         {
             try
@@ -810,6 +820,7 @@ namespace Fragmento_server.Controllers
         // POST: api/posts/{id}/save
         [HttpPost("{id}/save")]
         [Authorize]
+        [EnableRateLimiting("likes")]
         public async Task<IActionResult> SavePost(Guid id)
         {
             try
@@ -859,6 +870,7 @@ namespace Fragmento_server.Controllers
         // DELETE: api/posts/{id}/save
         [HttpDelete("{id}/save")]
         [Authorize]
+        [EnableRateLimiting("likes")]
         public async Task<IActionResult> UnsavePost(Guid id)
         {
             try

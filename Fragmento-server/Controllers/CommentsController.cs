@@ -10,6 +10,7 @@ using Fragmento_server.Models.Entities;
 using Fragmento_server.Models.Entities.Fragmento_server.Models.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -32,6 +33,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/comments/post/{postId}
         [HttpGet("post/{postId}")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<CommentPaginatedResponse>> GetComments(
             Guid postId,
             [FromQuery] GetCommentsRequest request)
@@ -146,6 +148,7 @@ namespace Fragmento_server.Controllers
 
         // GET: api/comments/{commentId}/replies
         [HttpGet("{commentId}/replies")]
+        [EnableRateLimiting("default")]
         public async Task<ActionResult<CommentPaginatedResponse>> GetReplies(
             Guid commentId,
             [FromQuery] GetCommentsRequest request)
@@ -240,6 +243,7 @@ namespace Fragmento_server.Controllers
         // POST: api/comments
         [HttpPost]
         [Authorize]
+        [EnableRateLimiting("comments")]
         public async Task<ActionResult<CommentDetailResponse>> CreateComment(CreateCommentRequest request)
         {
             _logger.LogInformation("Creating a new comment");
@@ -370,6 +374,7 @@ namespace Fragmento_server.Controllers
         // PUT: api/comments/{id}
         [HttpPut("{id}")]
         [Authorize]
+        [EnableRateLimiting("comments")]
         public async Task<IActionResult> UpdateComment(Guid id, UpdateCommentRequest request)
         {
             _logger.LogInformation($"Updating comment {id}");
@@ -409,6 +414,7 @@ namespace Fragmento_server.Controllers
         // DELETE: api/comments/{id}
         [HttpDelete("{id}")]
         [Authorize]
+        [EnableRateLimiting("comments")]
         public async Task<IActionResult> DeleteComment(Guid id)
         {
             _logger.LogInformation($"Deleting comment {id}");
@@ -467,6 +473,7 @@ namespace Fragmento_server.Controllers
         // POST: api/comments/{id}/like
         [HttpPost("{id}/like")]
         [Authorize]
+        [EnableRateLimiting("likes")]
         public async Task<IActionResult> LikeComment(Guid id)
         {
             _logger.LogInformation($"Liking comment {id}");
@@ -533,6 +540,7 @@ namespace Fragmento_server.Controllers
         // DELETE: api/comments/{id}/like
         [HttpDelete("{id}/like")]
         [Authorize]
+        [EnableRateLimiting("likes")]
         public async Task<IActionResult> UnlikeComment(Guid id)
         {
             _logger.LogInformation($"Unliking comment {id}");
