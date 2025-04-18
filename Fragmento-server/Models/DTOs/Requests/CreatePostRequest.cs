@@ -20,10 +20,10 @@ namespace Fragmento_server.Models.DTOs.Requests
         public string Description { get; set; }
 
         [StringLength(50)]
-        public string Occasion { get; set; }
+        public string? Occasion { get; set; }
 
         [StringLength(500)]
-        public string PhotoUrl { get; set; }
+        public string? PhotoUrl { get; set; }
 
         [Range(0, 100)]
         public int? DayNight { get; set; }

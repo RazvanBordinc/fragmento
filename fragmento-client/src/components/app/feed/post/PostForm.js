@@ -33,7 +33,7 @@ export default function PostForm({ onSubmit }) {
     name: "",
     brand: "",
     category: "",
-    description: "", // Added description field
+    description: "",
     tags: [],
     notes: [],
     accords: [],
@@ -52,7 +52,7 @@ export default function PostForm({ onSubmit }) {
     },
     dayNight: 5,
     occasion: "",
-    photos: [],
+    photoUrl: null, // Changed from photos array to photoUrl string
   });
 
   // Track which sections the user has visited/interacted with
@@ -232,11 +232,13 @@ export default function PostForm({ onSubmit }) {
           [field]: isComplete,
         }));
         break;
-      case "photos":
-        isComplete = value.length > 0;
+      case "photoUrl":
+        // PhotoUrl is optional, so always consider it "complete"
+        // Only mark as "truly complete" if there's actually a URL
+        isComplete = value !== null && value !== "";
         setCompletionStatus((prev) => ({
           ...prev,
-          [field]: isComplete,
+          photos: isComplete, // Keep the key as "photos" for backward compatibility
         }));
         break;
       default:
@@ -286,7 +288,7 @@ export default function PostForm({ onSubmit }) {
       formData.notes.length > 0 ||
       formData.accords.length > 0 ||
       formData.occasion !== "" ||
-      formData.photos.length > 0 ||
+      formData.photoUrl ||
       Object.values(completionStatus).some((status) => status === true)
     );
   };
@@ -447,7 +449,7 @@ export default function PostForm({ onSubmit }) {
                 exit="exit"
               >
                 <PhotoUpload
-                  photos={formData.photos}
+                  photoUrl={formData.photoUrl}
                   updateFormData={updateFormData}
                 />
               </motion.div>
@@ -576,13 +578,11 @@ export default function PostForm({ onSubmit }) {
                 </div>
 
                 {/* Photos preview */}
-                {formData.photos.length > 0 && (
+                {formData.photoUrl && (
                   <div className="mt-2 rounded-md p-2 bg-zinc-800/70 border border-zinc-700/50">
                     <div className="flex items-center text-zinc-300 mb-1 font-medium">
                       <Image size={12} className="mr-1 text-cyan-400" />
-                      <span className="truncate">
-                        Photos ({formData.photos.length})
-                      </span>
+                      <span className="truncate">Photos</span>
                     </div>
                     <div className="flex gap-1 overflow-x-auto pb-1">
                       {formData.photos.slice(0, 4).map((photo, idx) => (
@@ -593,11 +593,6 @@ export default function PostForm({ onSubmit }) {
                           className="w-10 h-10 rounded-md border border-zinc-600 object-cover flex-shrink-0"
                         />
                       ))}
-                      {formData.photos.length > 4 && (
-                        <div className="w-10 h-10 rounded-md border border-zinc-600 flex items-center justify-center bg-zinc-700 text-zinc-300 text-xs flex-shrink-0">
-                          +{formData.photos.length - 4}
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}

@@ -40,19 +40,29 @@ export default function FeedLayout({ initialPosts = [], isSavedPage = false }) {
   };
 
   useEffect(() => {
-    // If no initial posts were provided, fetch them
-    if (initialPosts.length === 0) {
-      fetchPosts();
-    }
+    // Always fetch posts fresh on component mount, even if initialPosts were provided
+    // This ensures posts are fetched from the server on refresh
+    fetchPosts();
+
+    // Optional: Log initial state for debugging
+    console.log("Initial posts:", initialPosts);
   }, []);
 
-  // Fetch posts based on current route
+  // Update the fetchPosts method in FeedLayout.js
+
+  // In FeedLayout.js, update the fetchPosts function to handle the API response format:
+
   const fetchPosts = async (pageNum = 1) => {
     try {
       setLoading(pageNum === 1);
       setError(null);
 
       let response;
+
+      // Log which endpoint we're using
+      console.log(
+        `Fetching posts for path: ${pathname}, page: ${pageNum}, user logged in: ${!!user}`
+      );
 
       // Determine which API endpoint to use based on the current path or prop
       if (isSavedPage) {
@@ -84,10 +94,29 @@ export default function FeedLayout({ initialPosts = [], isSavedPage = false }) {
           : await PostsApi.getPosts(pageNum);
       }
 
+      // Log the response for debugging
+      console.log("API response:", response);
+
+      // Check if we got a valid response
+      if (!response) {
+        throw new Error("No response from API");
+      }
+
+      // Handle case-sensitivity in response format - check for both "posts" and "Posts"
+      const postsArray = Array.isArray(response.posts)
+        ? response.posts
+        : Array.isArray(response.Posts)
+        ? response.Posts
+        : [];
+
+      console.log(`Found ${postsArray.length} posts in response`);
+
       // Map API posts to component format
-      const newPosts = (response.posts || []).map((apiPost) =>
+      const newPosts = postsArray.map((apiPost) =>
         mapApiPostToComponentPost(apiPost, currentUser)
       );
+
+      console.log(`Mapped ${newPosts.length} posts for display`);
 
       // Update posts state based on page number
       if (pageNum === 1) {
@@ -96,8 +125,9 @@ export default function FeedLayout({ initialPosts = [], isSavedPage = false }) {
         setPosts((prev) => [...prev, ...newPosts]);
       }
 
-      // Update pagination state
-      setHasMore(response.pagination?.hasMore || false);
+      // Update pagination state - also handle case sensitivity
+      const pagination = response.pagination || response.Pagination || {};
+      setHasMore(pagination.hasMore || pagination.HasMore || false);
       setPage(pageNum);
     } catch (err) {
       console.error("Error fetching posts:", err);
@@ -107,7 +137,6 @@ export default function FeedLayout({ initialPosts = [], isSavedPage = false }) {
       setIsLoadingMore(false);
     }
   };
-
   // Load more posts
   const loadMorePosts = () => {
     if (isLoadingMore || !hasMore) return;
@@ -118,17 +147,8 @@ export default function FeedLayout({ initialPosts = [], isSavedPage = false }) {
 
   const handlePostCreated = async (newPost) => {
     try {
-      // Convert to API format
-      const apiPostData = mapComponentPostToApiPost(newPost);
-
-      // Submit to the API
-      const response = await PostsApi.createPost(apiPostData);
-
-      // Convert response back to component format
-      const mappedPost = mapApiPostToComponentPost(response, currentUser);
-
       // Add the new post to the beginning of the list
-      setPosts((prevPosts) => [mappedPost, ...prevPosts]);
+      setPosts((prevPosts) => [newPost, ...prevPosts]);
 
       // Close the dialog
       setIsPostDialogOpen(false);
@@ -140,15 +160,14 @@ export default function FeedLayout({ initialPosts = [], isSavedPage = false }) {
         type: "success",
       });
     } catch (error) {
-      console.error("Error creating post:", error);
+      console.error("Error handling new post:", error);
       setToast({
         visible: true,
-        message: `Failed to create post: ${error.message}`,
+        message: `Error adding post to feed: ${error.message}`,
         type: "error",
       });
     }
   };
-
   const handlePostDeleted = async (postId) => {
     try {
       // Call the API to delete the post

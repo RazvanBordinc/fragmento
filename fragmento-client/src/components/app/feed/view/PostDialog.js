@@ -39,7 +39,7 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
       // and then include the URL in the post data
 
       let photoUrl = null;
-      if (formData.photos && formData.photos.length > 0) {
+      if (formData.photoUrl) {
         // This would normally be replaced with actual file upload code
         // For now, we'll just use a placeholder URL if there's a photo
         photoUrl = "https://via.placeholder.com/400x400";
@@ -63,6 +63,7 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
 
       // Call the parent component's callback with the new post
       if (onPostCreated) {
+        // Just pass the already created post to the parent
         onPostCreated(mappedResponse);
       }
 

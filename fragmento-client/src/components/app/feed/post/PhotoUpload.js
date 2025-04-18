@@ -2,12 +2,22 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Image, Upload, X, Camera } from "lucide-react";
+import { Image, Upload, X, Camera, AlertCircle, Loader } from "lucide-react";
+import { uploadImage, validateImage } from "@/lib/utils/ImageUploadService";
 
-export default function PhotoUpload({ photos, updateFormData }) {
+export default function PhotoUpload({ photoUrl, updateFormData }) {
   const [isDragging, setIsDragging] = useState(false);
   const [previewURL, setPreviewURL] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Initialize preview from props if available
+  useEffect(() => {
+    if (photoUrl && !previewURL) {
+      setPreviewURL(photoUrl);
+    }
+  }, [photoUrl]);
 
   // Handle file drop events
   const handleDragOver = (e) => {
@@ -24,62 +34,91 @@ export default function PhotoUpload({ photos, updateFormData }) {
     setIsDragging(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files[0]); // Only take the first file
+      handleFileSelection(e.dataTransfer.files[0]); // Only take the first file
     }
   };
 
   // Handle file input change
   const handleFileInputChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files[0]); // Only take the first file
+      handleFileSelection(e.target.files[0]); // Only take the first file
     }
   };
 
-  // Process file addition
-  const handleFiles = (file) => {
-    if (!file.type.startsWith("image/")) {
-      alert("Please upload an image file only.");
+  // Process file selection and upload
+  const handleFileSelection = async (file) => {
+    // Reset error state
+    setError(null);
+
+    // Validate the file
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      setError(validation.error);
       return;
     }
 
-    // Clean up previous preview URL if exists
-    if (previewURL) {
-      URL.revokeObjectURL(previewURL);
+    try {
+      // Show upload in progress
+      setIsUploading(true);
+
+      // Create local preview
+      const localPreviewUrl = URL.createObjectURL(file);
+      setPreviewURL(localPreviewUrl);
+
+      // Upload the file
+      const uploadedUrl = await uploadImage(file);
+
+      // If upload successful, update form data
+      if (uploadedUrl) {
+        // Update parent component
+        updateFormData("photoUrl", uploadedUrl);
+
+        // Clean up local preview URL if it's different from the uploaded URL
+        if (localPreviewUrl !== uploadedUrl) {
+          URL.revokeObjectURL(localPreviewUrl);
+          setPreviewURL(uploadedUrl);
+        }
+      } else {
+        setError("Failed to upload image. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error processing image:", err);
+      setError(err.message || "Failed to process image");
+
+      // Maintain the local preview even if upload failed
+      updateFormData("photoUrl", null);
+    } finally {
+      setIsUploading(false);
     }
-
-    // Create new URL for preview
-    const newURL = URL.createObjectURL(file);
-    setPreviewURL(newURL);
-
-    // Update form data with single photo
-    updateFormData("photos", [file]);
   };
 
   // Handle photo removal
   const removePhoto = () => {
     // Clean up the preview URL
-    if (previewURL) {
+    if (previewURL && !photoUrl) {
       URL.revokeObjectURL(previewURL);
-      setPreviewURL(null);
     }
 
-    updateFormData("photos", []);
+    // Reset states
+    setPreviewURL(null);
+    setError(null);
+
+    // Update parent component
+    updateFormData("photoUrl", null);
   };
 
   // Clean up ObjectURLs when component unmounts
   useEffect(() => {
     return () => {
-      if (previewURL) URL.revokeObjectURL(previewURL);
+      if (
+        previewURL &&
+        previewURL !== photoUrl &&
+        previewURL.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(previewURL);
+      }
     };
-  }, []);
-
-  // Initialize preview URL if photo exists
-  useEffect(() => {
-    if (photos.length > 0 && !previewURL) {
-      const url = URL.createObjectURL(photos[0]);
-      setPreviewURL(url);
-    }
-  }, [photos]);
+  }, [previewURL, photoUrl]);
 
   return (
     <div className="bg-gradient-to-br from-zinc-800 to-zinc-800/90 rounded-lg p-5 border border-zinc-700/80 shadow-lg">
@@ -90,10 +129,29 @@ export default function PhotoUpload({ photos, updateFormData }) {
         Photo
       </h3>
       <p className="text-zinc-400 text-sm mb-4">
-        Add a photo of your fragrance bottle or packaging.
+        Add a photo of your fragrance bottle or packaging (optional).
       </p>
 
-      {!photos.length || !previewURL ? (
+      {error && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start">
+          <AlertCircle
+            className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+            size={16}
+          />
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
+
+      {isUploading ? (
+        /* Upload in progress */
+        <div className="border-2 border-dashed border-cyan-500/50 bg-cyan-500/10 rounded-lg p-6 text-center">
+          <Loader className="h-10 w-10 mx-auto text-cyan-400 mb-3 animate-spin" />
+          <p className="text-zinc-300 font-medium mb-1">Uploading image...</p>
+          <p className="text-zinc-500 text-sm">
+            Please wait while your image is being processed
+          </p>
+        </div>
+      ) : !previewURL ? (
         /* Drag and drop area - only show if no photo is selected */
         <div
           className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors duration-200 ${
@@ -110,7 +168,7 @@ export default function PhotoUpload({ photos, updateFormData }) {
             type="file"
             ref={fileInputRef}
             className="hidden"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/gif,image/webp"
             onChange={handleFileInputChange}
           />
 
@@ -119,7 +177,7 @@ export default function PhotoUpload({ photos, updateFormData }) {
             Drag a photo here or click to upload
           </p>
           <p className="text-zinc-500 text-sm">
-            Upload a single image (JPG, PNG)
+            Upload a single image (JPG, PNG, GIF, WEBP)
           </p>
         </div>
       ) : (
@@ -131,7 +189,7 @@ export default function PhotoUpload({ photos, updateFormData }) {
             </h4>
             <button
               type="button"
-              onClick={() => removePhoto()}
+              onClick={removePhoto}
               className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors flex items-center"
             >
               <X className="h-4 w-4 mr-1" />
@@ -150,6 +208,11 @@ export default function PhotoUpload({ photos, updateFormData }) {
               src={previewURL}
               alt="Fragrance photo"
               className="w-full h-full object-contain rounded-lg border border-zinc-600 bg-zinc-800/50"
+              onError={(e) => {
+                console.error("Error loading image:", previewURL);
+                e.target.src =
+                  "https://via.placeholder.com/400x400?text=Image+Error";
+              }}
             />
           </motion.div>
         </div>

@@ -11,8 +11,17 @@
  * @param {Object} currentUser - Current user information
  * @returns {Object} - Mapped post data for frontend
  */
+/**
+ * Map an API Post response to the structure expected by frontend components
+ * @param {Object} apiPost - Post data from the API
+ * @param {Object} currentUser - Current user information
+ * @returns {Object} - Mapped post data for frontend
+ */
 export const mapApiPostToComponentPost = (apiPost, currentUser = null) => {
   if (!apiPost) return null;
+
+  // Log the raw API post for debugging
+  console.log("Mapping API post to component format:", apiPost);
 
   // Extract properties with fallbacks for both camelCase and PascalCase API responses
   const post = {
@@ -38,7 +47,9 @@ export const mapApiPostToComponentPost = (apiPost, currentUser = null) => {
         apiPost.fragrance?.description || apiPost.Fragrance?.Description || "",
       photo: apiPost.fragrance?.photoUrl || apiPost.Fragrance?.PhotoUrl || null,
       photoUrl:
-        apiPost.fragrance?.photoUrl || apiPost.Fragrance?.PhotoUrl || null,
+        apiPost.fragrance?.photoUrl ||
+        apiPost.Fragrance?.PhotoUrl ||
+        "/images/fragrance-placeholder.jpg", // Add fallback
       tags: apiPost.fragrance?.tags || apiPost.Fragrance?.Tags || [],
       notes: apiPost.fragrance?.notes || apiPost.Fragrance?.Notes || [],
       accords: apiPost.fragrance?.accords || apiPost.Fragrance?.Accords || [],
@@ -100,6 +111,9 @@ export const mapApiPostToComponentPost = (apiPost, currentUser = null) => {
         )
       : [],
   };
+
+  // Log the mapped post for verification
+  console.log("Mapped post:", { id: post.id, name: post.fragrance.name });
 
   return post;
 };

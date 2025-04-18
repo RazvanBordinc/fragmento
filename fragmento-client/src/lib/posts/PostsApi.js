@@ -92,15 +92,52 @@ const handleResponse = async (response) => {
  * API functions for posts
  */
 export const PostsApi = {
-  // Get paginated posts (can be used in both client and server components)
   getPosts: async (page = 1, pageSize = 20) => {
-    const response = await fetch(
-      `${API_BASE_URL}/posts?page=${page}&pageSize=${pageSize}`,
-      buildRequestOptions()
-    );
-    return handleResponse(response);
-  },
+    try {
+      // Log the request and parameters for debugging
+      console.log(`Fetching posts: page=${page}, pageSize=${pageSize}`);
 
+      // Make the fetch request
+      const response = await fetch(
+        `${API_BASE_URL}/posts?page=${page}&pageSize=${pageSize}`,
+        buildRequestOptions()
+      );
+
+      // Log the raw response status
+      console.log(`Posts response status: ${response.status}`);
+
+      // Clone the response for logging its content without consuming it
+      const responseClone = response.clone();
+      const responseText = await responseClone.text();
+      console.log(`Posts response body: ${responseText.substring(0, 200)}...`);
+
+      // Parse the response as JSON
+      const data = responseText ? JSON.parse(responseText) : null;
+
+      // Handle error responses
+      if (!response.ok) {
+        throw new Error(
+          `Error ${response.status}: ${
+            data?.message || "Failed to fetch posts"
+          }`
+        );
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      // Return an empty result rather than throwing the error
+      return {
+        posts: [],
+        pagination: {
+          currentPage: page,
+          pageSize,
+          totalCount: 0,
+          hasMore: false,
+        },
+      };
+    }
+  },
   // Get post feed (requires authentication)
   getFeed: async (page = 1, pageSize = 20) => {
     const response = await fetch(

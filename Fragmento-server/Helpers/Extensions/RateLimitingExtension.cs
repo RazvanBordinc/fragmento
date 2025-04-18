@@ -23,7 +23,7 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 600,
+                            PermitLimit = 60,
                             Window = TimeSpan.FromMinutes(1)
                         }));
 
@@ -34,10 +34,19 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 100,
+                            PermitLimit = 10,
                             Window = TimeSpan.FromMinutes(15)
                         }));
-
+                // Define policy for user profile and related operations
+                options.AddPolicy("default", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: GetUserIdentifier(httpContext),
+                        factory: partition => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 45,
+                            Window = TimeSpan.FromMinutes(5)
+                        }));
                 // Define policy for post creation and updates
                 options.AddPolicy("post_create", httpContext =>
                     RateLimitPartition.GetFixedWindowLimiter(
@@ -45,7 +54,7 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 100,
+                            PermitLimit = 10,
                             Window = TimeSpan.FromHours(1)
                         }));
 
@@ -56,7 +65,7 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 300,
+                            PermitLimit = 30,
                             Window = TimeSpan.FromMinutes(10)
                         }));
 
@@ -67,7 +76,7 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 600,
+                            PermitLimit = 60,
                             Window = TimeSpan.FromMinutes(10)
                         }));
 
@@ -78,7 +87,7 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 300,
+                            PermitLimit = 30,
                             Window = TimeSpan.FromMinutes(5)
                         }));
 
@@ -89,7 +98,7 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 300,
+                            PermitLimit = 30,
                             Window = TimeSpan.FromMinutes(10)
                         }));
 
@@ -100,7 +109,7 @@ namespace Fragmento_server.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 600,
+                            PermitLimit = 60,
                             Window = TimeSpan.FromMinutes(5)
                         }));
 

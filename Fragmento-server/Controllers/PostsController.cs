@@ -57,27 +57,107 @@ namespace Fragmento_server.Controllers
                 // Calculate skip for pagination
                 int skip = (page - 1) * pageSize;
 
-                var posts = await _context.Posts
+                // Make sure to properly include all related entities
+                var postsQuery = _context.Posts
                     .Include(p => p.User)
-                    .Include(p => p.Fragrance)
-                        .ThenInclude(f => f.Tags)
-                    .Include(p => p.Fragrance)
-                        .ThenInclude(f => f.Notes)
-                    .Include(p => p.Fragrance)
-                        .ThenInclude(f => f.Accords)
-                    .Include(p => p.Fragrance)
-                        .ThenInclude(f => f.Ratings)
-                    .Include(p => p.Fragrance)
-                        .ThenInclude(f => f.Seasons)
                     .Include(p => p.Likes)
-                    .Include(p => p.Comments)
+                    .Include(p => p.Comments.Where(c => c.ParentCommentId == null).OrderByDescending(c => c.CreatedAt).Take(3))
                         .ThenInclude(c => c.User)
+                    .Include(p => p.Comments.Where(c => c.ParentCommentId == null).OrderByDescending(c => c.CreatedAt).Take(3))
+                        .ThenInclude(c => c.Likes)
+                    .AsSplitQuery(); // Use split queries for better performance with multiple includes
+
+                // Apply ordering, pagination, then fetch
+                var posts = await postsQuery
                     .OrderByDescending(p => p.CreatedAt)
                     .Skip(skip)
                     .Take(pageSize)
                     .ToListAsync();
 
                 _logger.LogInformation("Retrieved {Count} posts", posts.Count);
+
+                // Second pass to load Fragrance related entities for each post since they have a separate relationship
+                foreach (var post in posts)
+                {
+                    if (post.Fragrance == null)
+                    {
+                        _logger.LogWarning($"Post {post.Id} has null Fragrance - attempting to fix");
+
+                        // Find the fragrance explicitly by PostId since it's a one-to-one relationship
+                        var fragrance = await _context.Fragrances
+                            .Include(f => f.Tags)
+                            .Include(f => f.Notes)
+                            .Include(f => f.Accords)
+                            .Include(f => f.Ratings)
+                            .Include(f => f.Seasons)
+                            .FirstOrDefaultAsync(f => f.PostId == post.Id);
+
+                        if (fragrance != null)
+                        {
+                            post.Fragrance = fragrance;
+                            _logger.LogInformation($"Found and loaded Fragrance for Post {post.Id}");
+                        }
+                        else
+                        {
+                            _logger.LogError($"Could not find Fragrance for Post {post.Id}");
+                        }
+                    }
+                    else
+                    {
+                        // Ensure the related entities of Fragrance are loaded
+                        if (!_context.Entry(post.Fragrance).Collection(f => f.Tags).IsLoaded)
+                        {
+                            await _context.Entry(post.Fragrance).Collection(f => f.Tags).LoadAsync();
+                        }
+
+                        if (!_context.Entry(post.Fragrance).Collection(f => f.Notes).IsLoaded)
+                        {
+                            await _context.Entry(post.Fragrance).Collection(f => f.Notes).LoadAsync();
+                        }
+
+                        if (!_context.Entry(post.Fragrance).Collection(f => f.Accords).IsLoaded)
+                        {
+                            await _context.Entry(post.Fragrance).Collection(f => f.Accords).LoadAsync();
+                        }
+
+                        if (!_context.Entry(post.Fragrance).Reference(f => f.Ratings).IsLoaded)
+                        {
+                            await _context.Entry(post.Fragrance).Reference(f => f.Ratings).LoadAsync();
+
+                            // If Ratings is still null, create a default one
+                            if (post.Fragrance.Ratings == null)
+                            {
+                                post.Fragrance.Ratings = new FragranceRatings
+                                {
+                                    FragranceId = post.Fragrance.Id,
+                                    Overall = 5,
+                                    Longevity = 5,
+                                    Sillage = 5,
+                                    Scent = 5,
+                                    Value = 5
+                                };
+                            }
+                        }
+
+                        if (!_context.Entry(post.Fragrance).Reference(f => f.Seasons).IsLoaded)
+                        {
+                            await _context.Entry(post.Fragrance).Reference(f => f.Seasons).LoadAsync();
+
+                            // If Seasons is still null, create a default one
+                            if (post.Fragrance.Seasons == null)
+                            {
+                                post.Fragrance.Seasons = new FragranceSeasons
+                                {
+                                    FragranceId = post.Fragrance.Id,
+                                    Spring = 3,
+                                    Summer = 3,
+                                    Fall = 3,
+                                    Winter = 3
+                                };
+                            }
+                        }
+                    }
+                }
 
                 // Check for current user to determine if posts are liked/saved
                 Guid? currentUserId = null;
@@ -86,8 +166,11 @@ namespace Fragmento_server.Controllers
                     currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
                 }
 
-                // Transform to response DTOs
-                var postResponses = posts.Select(p => MapPostToResponse(p, currentUserId)).ToList();
+                // Transform to response DTOs with our improved mapping method
+                var postResponses = posts
+                    .Select(p => MapPostToResponse(p, currentUserId))
+                    .Where(p => p != null) // Filter out any nulls that might result from mapping errors
+                    .ToList();
 
                 // Return with pagination metadata
                 return Ok(new
@@ -333,7 +416,7 @@ namespace Fragmento_server.Controllers
                     return BadRequest(ModelState);
                 }
 
-                // Validate key fields
+                // Validate key fields (only required ones)
                 if (string.IsNullOrEmpty(request.Name) || string.IsNullOrEmpty(request.Brand) || string.IsNullOrEmpty(request.Category))
                 {
                     _logger.LogWarning("Missing required fields for post creation");
@@ -344,91 +427,152 @@ namespace Fragmento_server.Controllers
                 var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
                 _logger.LogInformation("Creating new post for user {UserId}", currentUserId);
 
-                // Create the post
-                var post = new Post
+                try
                 {
-                    UserId = currentUserId,
-                    CreatedAt = DateTime.UtcNow,
-                    Fragrance = new Fragrance
+                    // Load the user to ensure it exists
+                    var user = await _context.Users.FindAsync(currentUserId);
+                    if (user == null)
                     {
+                        _logger.LogError($"User {currentUserId} not found when creating post");
+                        return NotFound("User not found");
+                    }
+
+                    // Create the post with all related entities
+                    var post = new Post
+                    {
+                        Id = Guid.NewGuid(), // Explicitly set ID
+                        UserId = currentUserId,
+                        User = user, // Set the user navigation property
+                        CreatedAt = DateTime.UtcNow,
+                        Comments = new List<Comment>(),
+                        Likes = new List<PostLike>()
+                    };
+
+                    // Create the fragrance with relationship to post
+                    var fragrance = new Fragrance
+                    {
+                        Id = Guid.NewGuid(), // Explicitly set ID
+                        PostId = post.Id, // Set the foreign key
+                        Post = post, // Set the navigation property
                         Name = request.Name,
                         Brand = request.Brand,
                         Category = request.Category,
-                        Description = request.Description,
-                        Occasion = request.Occasion,
-                        PhotoUrl = request.PhotoUrl,
+                        Description = request.Description, // Optional
+                        Occasion = request.Occasion, // Optional
+                        PhotoUrl = request.PhotoUrl, // Optional
                         DayNightPreference = request.DayNight ?? 50,
+                        Tags = new List<FragranceTag>(),
+                        Notes = new List<FragranceNote>(),
+                        Accords = new List<FragranceAccord>()
+                    };
 
-                        // Create ratings
-                        Ratings = new FragranceRatings
-                        {
-                            Overall = request.Ratings?.Overall ?? 5,
-                            Longevity = request.Ratings?.Longevity ?? 5,
-                            Sillage = request.Ratings?.Sillage ?? 5,
-                            Scent = request.Ratings?.Scent ?? 5,
-                            Value = request.Ratings?.Value ?? 5
-                        },
+                    // Set the fragrance on the post
+                    post.Fragrance = fragrance;
 
-                        // Create seasons
-                        Seasons = new FragranceSeasons
+                    // Create ratings for the fragrance
+                    var ratings = new FragranceRatings
+                    {
+                        Id = Guid.NewGuid(),
+                        FragranceId = fragrance.Id,
+                        Fragrance = fragrance,
+                        Overall = request.Ratings?.Overall ?? 5,
+                        Longevity = request.Ratings?.Longevity ?? 5,
+                        Sillage = request.Ratings?.Sillage ?? 5,
+                        Scent = request.Ratings?.Scent ?? 5,
+                        Value = request.Ratings?.Value ?? 5
+                    };
+
+                    // Create seasons for the fragrance
+                    var seasons = new FragranceSeasons
+                    {
+                        Id = Guid.NewGuid(),
+                        FragranceId = fragrance.Id,
+                        Fragrance = fragrance,
+                        Spring = request.Seasons?.Spring ?? 3,
+                        Summer = request.Seasons?.Summer ?? 3,
+                        Fall = request.Seasons?.Fall ?? 3,
+                        Winter = request.Seasons?.Winter ?? 3
+                    };
+
+                    // Set the ratings and seasons on the fragrance
+                    fragrance.Ratings = ratings;
+                    fragrance.Seasons = seasons;
+
+                    // Add tags if provided (safely handle null collections)
+                    if (request.Tags != null && request.Tags.Any())
+                    {
+                        foreach (var tag in request.Tags)
                         {
-                            Spring = request.Seasons?.Spring ?? 3,
-                            Summer = request.Seasons?.Summer ?? 3,
-                            Fall = request.Seasons?.Fall ?? 3,
-                            Winter = request.Seasons?.Winter ?? 3
+                            if (!string.IsNullOrEmpty(tag))
+                            {
+                                fragrance.Tags.Add(new FragranceTag
+                                {
+                                    Id = Guid.NewGuid(),
+                                    FragranceId = fragrance.Id,
+                                    Fragrance = fragrance,
+                                    Name = tag
+                                });
+                            }
                         }
                     }
-                };
 
-                // Add tags
-                if (request.Tags != null && request.Tags.Any())
-                {
-                    foreach (var tag in request.Tags)
+                    // Add notes if provided (safely handle null collections)
+                    if (request.Notes != null && request.Notes.Any())
                     {
-                        post.Fragrance.Tags.Add(new FragranceTag
+                        int order = 0;
+                        foreach (var note in request.Notes)
                         {
-                            Name = tag
-                        });
+                            if (note != null && !string.IsNullOrEmpty(note.Name))
+                            {
+                                fragrance.Notes.Add(new FragranceNote
+                                {
+                                    Id = Guid.NewGuid(),
+                                    FragranceId = fragrance.Id,
+                                    Fragrance = fragrance,
+                                    Name = note.Name,
+                                    Category = note.Category ?? "unspecified",
+                                    Order = order++
+                                });
+                            }
+                        }
                     }
-                }
 
-                // Add notes
-                if (request.Notes != null && request.Notes.Any())
-                {
-                    int order = 0;
-                    foreach (var note in request.Notes)
+                    // Add accords if provided (safely handle null collections)
+                    if (request.Accords != null && request.Accords.Any())
                     {
-                        post.Fragrance.Notes.Add(new FragranceNote
+                        foreach (var accord in request.Accords)
                         {
-                            Name = note.Name,
-                            Category = note.Category,
-                            Order = order++
-                        });
+                            if (!string.IsNullOrEmpty(accord))
+                            {
+                                fragrance.Accords.Add(new FragranceAccord
+                                {
+                                    Id = Guid.NewGuid(),
+                                    FragranceId = fragrance.Id,
+                                    Fragrance = fragrance,
+                                    Name = accord
+                                });
+                            }
+                        }
                     }
-                }
 
-                // Add accords
-                if (request.Accords != null && request.Accords.Any())
+                    // Add entities to context in correct order to maintain relationships
+                    _context.Posts.Add(post);
+                    _context.Fragrances.Add(fragrance);
+                    _context.FragranceRatings.Add(ratings);
+                    _context.FragranceSeasons.Add(seasons);
+
+                    await _context.SaveChangesAsync();
+
+                    _logger.LogInformation("Post created successfully with ID: {PostId}", post.Id);
+
+                    // Return created post with location header
+                    return CreatedAtAction(nameof(GetPost), new { id = post.Id }, MapPostToResponse(post, currentUserId));
+                }
+                catch (DbUpdateException dbEx)
                 {
-                    foreach (var accord in request.Accords)
-                    {
-                        post.Fragrance.Accords.Add(new FragranceAccord
-                        {
-                            Name = accord
-                        });
-                    }
+                    _logger.LogError(dbEx, "Database error occurred while creating post");
+                    return StatusCode(500, "Database error occurred. Please try again.");
                 }
-
-                _context.Posts.Add(post);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Post created successfully with ID: {PostId}", post.Id);
-
-                // Load the user for the response
-                await _context.Entry(post).Reference(p => p.User).LoadAsync();
-
-                // Return created post with location header
-                return CreatedAtAction(nameof(GetPost), new { id = post.Id }, MapPostToResponse(post, currentUserId));
             }
             catch (Exception ex)
             {
@@ -906,116 +1050,199 @@ namespace Fragmento_server.Controllers
 
         private PostResponse MapPostToResponse(Post post, Guid? currentUserId, bool includeAllComments = false)
         {
-            // Determine if current user has liked or saved this post
-            bool isLiked = false;
-            bool isSaved = false;
-
-            if (currentUserId.HasValue)
+            // Check if post is null (add early return to prevent null reference)
+            if (post == null)
             {
-                isLiked = post.Likes.Any(l => l.UserId == currentUserId);
-
-                // Note: We'd need to load the SavedPosts relation separately
-                // For now, we can't determine this without an additional query
-                // isSaved = post.SavedPosts.Any(sp => sp.UserId == currentUserId);
+                _logger.LogWarning("Attempted to map a null post to response");
+                return null;
             }
 
-            // Top-level comments to include, optionally filtered
-            var comments = post.Comments
-                .Where(c => c.ParentCommentId == null); // Only top-level comments
-
-            if (!includeAllComments)
+            try
             {
-                comments = comments.Take(3); // Limit to 3 comments for feed view
-            }
+                // Determine if current user has liked or saved this post
+                bool isLiked = false;
+                bool isSaved = false;
 
-            return new PostResponse
-            {
-                Id = post.Id.ToString(),
-                User = new UserBriefResponse
+                if (currentUserId.HasValue && post.Likes != null)
                 {
-                    Id = post.User.Id.ToString(),
-                    Username = post.User.Username,
-                    ProfilePictureUrl = post.User.ProfilePictureUrl
-                },
-                CreatedAt = post.CreatedAt,
-                UpdatedAt = post.UpdatedAt,
-                Fragrance = new FragranceResponse
+                    isLiked = post.Likes.Any(l => l.UserId == currentUserId);
+                    // Note: We'd need to load the SavedPosts relation separately
+                    // For now, we can't determine this without an additional query
+                    // isSaved = post.SavedPosts.Any(sp => sp.UserId == currentUserId);
+                }
+
+                // Top-level comments to include, optionally filtered
+                IEnumerable<Comment> comments = Enumerable.Empty<Comment>();
+                if (post.Comments != null)
                 {
-                    Id = post.Fragrance.Id.ToString(),
-                    Name = post.Fragrance.Name,
-                    Brand = post.Fragrance.Brand,
-                    Category = post.Fragrance.Category,
-                    Description = post.Fragrance.Description,
-                    Occasion = post.Fragrance.Occasion,
-                    PhotoUrl = post.Fragrance.PhotoUrl,
-                    DayNightPreference = post.Fragrance.DayNightPreference,
-                    Tags = post.Fragrance.Tags.Select(t => t.Name).ToList(),
-                    Notes = post.Fragrance.Notes.Select(n => new NoteResponse
+                    comments = post.Comments
+                        .Where(c => c.ParentCommentId == null); // Only top-level comments
+
+                    if (!includeAllComments)
+                    {
+                        comments = comments.Take(3); // Limit to 3 comments for feed view
+                    }
+                }
+
+                // User null check and default
+                var userResponse = new UserBriefResponse
+                {
+                    Id = post.User?.Id.ToString() ?? "00000000-0000-0000-0000-000000000000",
+                    Username = post.User?.Username ?? "Unknown User",
+                    ProfilePictureUrl = post.User?.ProfilePictureUrl
+                };
+
+                // Fragrance null check and default
+                var fragranceResponse = new FragranceResponse
+                {
+                    Id = post.Fragrance?.Id.ToString() ?? "00000000-0000-0000-0000-000000000000",
+                    Name = post.Fragrance?.Name ?? "Unknown Fragrance",
+                    Brand = post.Fragrance?.Brand ?? "Unknown Brand",
+                    Category = post.Fragrance?.Category ?? "Unknown",
+                    Description = post.Fragrance?.Description,
+                    Occasion = post.Fragrance?.Occasion,
+                    PhotoUrl = post.Fragrance?.PhotoUrl,
+                    DayNightPreference = post.Fragrance?.DayNightPreference ?? 50,
+
+                    // Handle null collection properties
+                    Tags = post.Fragrance?.Tags?.Select(t => t.Name).ToList() ?? new List<string>(),
+                    Notes = post.Fragrance?.Notes?.Select(n => new NoteResponse
                     {
                         Name = n.Name,
                         Category = n.Category
-                    }).ToList(),
-                    Accords = post.Fragrance.Accords.Select(a => a.Name).ToList(),
-                    Ratings = new RatingsResponse
+                    }).ToList() ?? new List<NoteResponse>(),
+                    Accords = post.Fragrance?.Accords?.Select(a => a.Name).ToList() ?? new List<string>(),
+
+                    // Handle null ratings
+                    Ratings = post.Fragrance?.Ratings != null ? new RatingsResponse
                     {
                         Overall = post.Fragrance.Ratings.Overall,
                         Longevity = post.Fragrance.Ratings.Longevity,
                         Sillage = post.Fragrance.Ratings.Sillage,
                         Scent = post.Fragrance.Ratings.Scent,
                         Value = post.Fragrance.Ratings.Value
+                    } : new RatingsResponse
+                    {
+                        Overall = 5,
+                        Longevity = 5,
+                        Sillage = 5,
+                        Scent = 5,
+                        Value = 5
                     },
-                    Seasons = new SeasonsResponse
+
+                    // Handle null seasons
+                    Seasons = post.Fragrance?.Seasons != null ? new SeasonsResponse
                     {
                         Spring = post.Fragrance.Seasons.Spring,
                         Summer = post.Fragrance.Seasons.Summer,
                         Fall = post.Fragrance.Seasons.Fall,
                         Winter = post.Fragrance.Seasons.Winter
+                    } : new SeasonsResponse
+                    {
+                        Spring = 3,
+                        Summer = 3,
+                        Fall = 3,
+                        Winter = 3
                     }
-                },
-                LikesCount = post.Likes.Count,
-                CommentsCount = post.Comments.Count,
-                IsLiked = isLiked,
-                IsSaved = isSaved,
-                Comments = comments.Select(c => MapCommentToResponse(c, currentUserId)).ToList()
-            };
+                };
+
+                return new PostResponse
+                {
+                    Id = post.Id.ToString(),
+                    User = userResponse,
+                    CreatedAt = post.CreatedAt,
+                    UpdatedAt = post.UpdatedAt,
+                    Fragrance = fragranceResponse,
+                    LikesCount = post.Likes?.Count ?? 0,
+                    CommentsCount = post.Comments?.Count ?? 0,
+                    IsLiked = isLiked,
+                    IsSaved = isSaved,
+                    Comments = comments
+                        .Select(c => MapCommentToResponse(c, currentUserId))
+                        .Where(c => c != null) // Filter out null comments
+                        .ToList()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error mapping post {post.Id} to response");
+
+                // Return a minimal response instead of throwing
+                return new PostResponse
+                {
+                    Id = post.Id.ToString(),
+                    User = new UserBriefResponse { Username = "Error" },
+                    CreatedAt = post.CreatedAt,
+                    Fragrance = new FragranceResponse { Name = "Error loading fragrance data" },
+                    Comments = new List<CommentResponse>()
+                };
+            }
         }
 
         private CommentResponse MapCommentToResponse(Comment comment, Guid? currentUserId)
         {
-            // Determine if current user has liked this comment
-            bool isLiked = false;
-            if (currentUserId.HasValue)
+            // Early return if comment is null
+            if (comment == null)
             {
-                isLiked = comment.Likes.Any(l => l.UserId == currentUserId);
+                _logger.LogWarning("Attempted to map a null comment to response");
+                return null;
             }
 
-            var response = new CommentResponse
+            try
             {
-                Id = comment.Id.ToString(),
-                User = new UserBriefResponse
+                // Determine if current user has liked this comment
+                bool isLiked = false;
+                if (currentUserId.HasValue && comment.Likes != null)
                 {
-                    Id = comment.User.Id.ToString(),
-                    Username = comment.User.Username,
-                    ProfilePictureUrl = comment.User.ProfilePictureUrl
-                },
-                Text = comment.Text,
-                CreatedAt = comment.CreatedAt,
-                UpdatedAt = comment.UpdatedAt,
-                LikesCount = comment.Likes.Count,
-                RepliesCount = comment.Replies.Count,
-                IsLiked = isLiked,
-                IsOwner = currentUserId.HasValue && comment.UserId == currentUserId
-            };
+                    isLiked = comment.Likes.Any(l => l.UserId == currentUserId);
+                }
 
-            // Add replies if they exist
-            if (comment.Replies != null && comment.Replies.Count > 0)
-            {
-                response.Replies = comment.Replies
-                    .Select(r => MapCommentToResponse(r, currentUserId))
-                    .ToList();
+                var response = new CommentResponse
+                {
+                    Id = comment.Id.ToString(),
+                    User = comment.User != null ? new UserBriefResponse
+                    {
+                        Id = comment.User.Id.ToString(),
+                        Username = comment.User.Username,
+                        ProfilePictureUrl = comment.User.ProfilePictureUrl
+                    } : new UserBriefResponse { Username = "Unknown" },
+                    Text = comment.Text,
+                    CreatedAt = comment.CreatedAt,
+                    UpdatedAt = comment.UpdatedAt,
+                    LikesCount = comment.Likes?.Count ?? 0,
+                    RepliesCount = comment.Replies?.Count ?? 0,
+                    IsLiked = isLiked,
+                    IsOwner = currentUserId.HasValue && currentUserId == comment.UserId
+                };
+
+                // Add replies if they exist
+                if (comment.Replies != null && comment.Replies.Count > 0)
+                {
+                    response.Replies = comment.Replies
+                        .Select(r => MapCommentToResponse(r, currentUserId))
+                        .Where(r => r != null) // Filter out any nulls that might result from mapping
+                        .ToList();
+                }
+                else
+                {
+                    response.Replies = new List<CommentResponse>();
+                }
+
+                return response;
             }
-
-            return response;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error mapping comment {comment.Id} to response");
+                // Return a basic response instead of throwing
+                return new CommentResponse
+                {
+                    Id = comment.Id.ToString(),
+                    Text = "[Error displaying comment]",
+                    CreatedAt = comment.CreatedAt,
+                    LikesCount = 0,
+                    RepliesCount = 0
+                };
+            }
         }
     }
 }
