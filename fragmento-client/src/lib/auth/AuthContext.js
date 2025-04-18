@@ -4,7 +4,8 @@
 
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { validateToken, refreshToken } from "./AuthService"; // Adjust the import path as needed
+import { validateToken, refreshToken, logoutUser } from "./AuthService";
+import { storeAuthData, clearAuthData, getCookie } from "./CookieService";
 
 // Create context
 const AuthContext = createContext();
@@ -22,27 +23,46 @@ export const AuthProvider = ({ children }) => {
       try {
         setLoading(true);
 
-        // Try to get user from localStorage
+        // Check for token in cookies first (for SSR/middleware compatibility)
+        const cookieToken = getCookie("token");
+
+        // Then check localStorage (client-side)
         const storedUser = localStorage.getItem("user");
         const storedToken = localStorage.getItem("token");
         const storedRefreshToken = localStorage.getItem("refreshToken");
 
-        if (storedUser && storedToken) {
+        // Prioritize cookie token (for middleware compatibility)
+        const token = cookieToken || storedToken;
+
+        if (token) {
           // Check if token is valid
           const isValid = await validateToken();
 
           if (isValid) {
-            setUser(JSON.parse(storedUser));
+            // If we have cookie data, reconstruct the user object
+            if (cookieToken) {
+              const cookieUserId = getCookie("userId");
+              const cookieUsername = getCookie("username");
+
+              setUser({
+                id: cookieUserId,
+                username: cookieUsername,
+                // Email might not be in cookie to keep cookie size small
+                email: storedUser ? JSON.parse(storedUser).email : "",
+              });
+            } else if (storedUser) {
+              // Otherwise use localStorage data
+              setUser(JSON.parse(storedUser));
+            }
           } else if (storedRefreshToken) {
             // Try to refresh the token
             try {
               const refreshResult = await refreshToken(storedRefreshToken);
 
-              // Save new tokens
-              localStorage.setItem("token", refreshResult.token);
-              localStorage.setItem("refreshToken", refreshResult.refreshToken);
+              // Store all auth data in both localStorage and cookies
+              storeAuthData(refreshResult);
 
-              // Update user if needed
+              // Update user
               setUser({
                 id: refreshResult.id,
                 username: refreshResult.username,
@@ -78,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       email: userData.email,
     });
 
-    // Save in localStorage
+    // Save user in localStorage
     localStorage.setItem(
       "user",
       JSON.stringify({
@@ -87,8 +107,16 @@ export const AuthProvider = ({ children }) => {
         email: userData.email,
       })
     );
-    localStorage.setItem("token", token);
-    localStorage.setItem("refreshToken", refreshToken);
+
+    // Store auth data in both localStorage and cookies
+    storeAuthData({
+      id: userData.id,
+      username: userData.username,
+      email: userData.email,
+      token,
+      refreshToken,
+      tokenExpiration,
+    });
 
     // If expiration is provided, set a timer to refresh token
     if (tokenExpiration) {
@@ -121,17 +149,44 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Logout handler
-  const logout = () => {
-    // Clear user from state
-    setUser(null);
+  const logout = async () => {
+    try {
+      // Get the refresh token before clearing storage
+      const refreshTokenValue = localStorage.getItem("refreshToken");
 
-    // Clear localStorage
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
+      // Try to call the backend logout API if we have a refresh token
+      if (refreshTokenValue) {
+        try {
+          await logoutUser(refreshTokenValue);
+        } catch (error) {
+          console.error("Error calling logout API:", error);
+          // Continue with local logout even if API call fails
+        }
+      }
 
-    // Redirect to home/login page
-    router.push("/");
+      // Clear user from state
+      setUser(null);
+
+      // Clear all storage with our enhanced method
+      clearAuthData();
+
+      // Also clear user object from localStorage
+      localStorage.removeItem("user");
+
+      // Force expiration of token cookie by setting to past date
+      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+      document.cookie =
+        "userId=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+      document.cookie =
+        "username=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+
+      // Redirect to home/login page
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Even if there's an error, try to redirect to login
+      router.push("/");
+    }
   };
 
   // Create the context value

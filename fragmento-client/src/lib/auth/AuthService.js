@@ -4,14 +4,29 @@
  * @format
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5293/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5293";
+
+/**
+ * Convert PascalCase object properties to camelCase
+ * This handles the mismatch between .NET's PascalCase and JavaScript's camelCase
+ */
+const normalizeCasing = (data) => {
+  if (!data || typeof data !== "object") return data;
+
+  return Object.keys(data).reduce((result, key) => {
+    // Convert first character to lowercase
+    const normalizedKey = key.charAt(0).toLowerCase() + key.slice(1);
+    result[normalizedKey] = data[key];
+    return result;
+  }, {});
+};
 
 /**
  * Register a new user
  */
 export const registerUser = async (userData) => {
   try {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const response = await fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -20,20 +35,23 @@ export const registerUser = async (userData) => {
         email: userData.email,
         username: userData.username,
         password: userData.password,
-        confirmPassword: userData.confirmPassword,
+        confirmPassword: formData.confirmPassword,
       }),
+      credentials: "include",
     });
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const data = normalizeCasing(rawData);
 
     if (!response.ok) {
-      const errorMessage = data.message || "Registration failed";
-      console.error("Registration error details:", data);
+      const formattedErrors = Object.values(data.errors).flat();
+
+      const errorMessage = formattedErrors || 1 || "Registration failed";
       throw new Error(errorMessage);
     }
+
     return data;
   } catch (error) {
-    console.error("Registration error:", error);
     throw error;
   }
 };
@@ -43,25 +61,32 @@ export const registerUser = async (userData) => {
  */
 export const loginUser = async (credentials) => {
   try {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(credentials),
+      credentials: "include",
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
 
-    if (!response.ok) {
-      const errorMessage = data.message || "Registration failed";
-      console.error("Registration error details:", data);
-      throw new Error(errorMessage);
+    let rawData;
+    try {
+      rawData = JSON.parse(responseText);
+      const data = normalizeCasing(rawData);
+
+      if (!response.ok) {
+        const errorMessage = data.message || rawData.Message || "Login failed";
+        throw new Error(errorMessage);
+      }
+
+      return data;
+    } catch (e) {
+      throw new Error("Invalid response from server");
     }
-
-    return data;
   } catch (error) {
-    console.error("Login error:", error);
     throw error;
   }
 };
@@ -69,59 +94,71 @@ export const loginUser = async (credentials) => {
 /**
  * Refresh auth token
  */
-export const refreshToken = async (refreshToken) => {
+export const refreshToken = async (refreshTokenValue) => {
   try {
-    const response = await fetch(`${API_URL}/auth/refresh`, {
+    const response = await fetch(`${API_URL}/api/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ refreshToken: refreshTokenValue }),
+      credentials: "include",
     });
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const data = normalizeCasing(rawData);
 
     if (!response.ok) {
-      const errorMessage = data.message || "Registration failed";
-      console.error("Registration error details:", data);
+      const errorMessage =
+        data.message || rawData.Message || "Token refresh failed";
       throw new Error(errorMessage);
     }
 
     return data;
   } catch (error) {
-    console.error("Token refresh error:", error);
     throw error;
   }
 };
+/**
+ * Updated logoutUser function for AuthService.js
+ *
+ * Replace the existing logoutUser function with this one:
+ */
 
 /**
  * Logout user
  */
-export const logoutUser = async (refreshToken) => {
+export const logoutUser = async (refreshTokenValue) => {
   try {
-    const response = await fetch(`${API_URL}/auth/logout`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
+    // Get the token from localStorage
+    const token = localStorage.getItem("token");
 
-    if (!response.ok) {
-      const errorMessage = data.message || "Registration failed";
-      console.error("Registration error details:", data);
-      throw new Error(errorMessage);
+    // Only proceed with API call if we have a token and refresh token
+    if (token && refreshTokenValue) {
+      const response = await fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ refreshToken: refreshTokenValue }),
+        credentials: "include", // Important for cookies
+      });
+
+      // Even if the response is not OK, we still want to clear local data
+      if (!response.ok) {
+        console.warn("Server logout returned error status:", response.status);
+      }
     }
 
     return true;
   } catch (error) {
     console.error("Logout error:", error);
-    throw error;
+    // Still return true so the UI can proceed with local logout
+    return true;
   }
 };
-
 /**
  * Validate current token
  */
@@ -133,16 +170,16 @@ export const validateToken = async () => {
       return false;
     }
 
-    const response = await fetch(`${API_URL}/auth/validate`, {
+    const response = await fetch(`${API_URL}/api/auth/validate`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      credentials: "include",
     });
 
     return response.ok;
   } catch (error) {
-    console.error("Token validation error:", error);
     return false;
   }
 };
@@ -152,23 +189,22 @@ export const validateToken = async () => {
  */
 export const changePassword = async (passwordData) => {
   try {
-    const response = await fetch(`${API_URL}/auth/change-password`, {
+    const response = await fetch(`${API_URL}/api/auth/change-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
       body: JSON.stringify(passwordData),
+      credentials: "include",
     });
+
     if (!response.ok) {
-      const errorMessage = data.message || "Registration failed";
-      console.error("Registration error details:", data);
-      throw new Error(errorMessage);
+      throw new Error("Password change failed");
     }
 
     return true;
   } catch (error) {
-    console.error("Password change error:", error);
     throw error;
   }
 };

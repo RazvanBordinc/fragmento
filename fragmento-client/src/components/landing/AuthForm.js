@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { storeAuthData } from "@/lib/auth/CookieService";
 
 export default function AuthForm() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function AuthForm() {
   // Form fields configuration - defines the order and validation for each step
   const loginFields = [
     {
-      name: "username", // Changed from email to username for login as per AuthController.cs
+      name: "username",
       label: "What's your username?",
       type: "text",
       placeholder: "your_username",
@@ -215,21 +216,44 @@ export default function AuthForm() {
             username: formData.username,
             password: formData.password,
           }),
+          credentials: "include", // Important: include credentials for cookies
         });
 
-        const data = await response.json();
-
+        // First check if the response is OK
         if (!response.ok) {
-          throw new Error(data.message || "Login failed");
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Login failed");
         }
 
-        // Store token in localStorage
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("refreshToken", data.refreshToken);
-        localStorage.setItem("tokenExpiration", data.tokenExpiration);
-        localStorage.setItem("userId", data.id);
-        localStorage.setItem("username", data.username);
-        localStorage.setItem("email", data.email);
+        // Parse response data
+        const data = await response.json();
+
+        // Check if we have a valid token
+        if (!data.token) {
+          throw new Error("No authentication token received from server");
+        }
+
+        // Clean the token if it has Bearer prefix
+        const cleanToken = data.token.startsWith("Bearer ")
+          ? data.token.substring(7)
+          : data.token;
+
+        try {
+          // Use the direct document.cookie approach for the token
+          const tokenExpiry = new Date();
+          tokenExpiry.setTime(tokenExpiry.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+          document.cookie = `token=${cleanToken}; expires=${tokenExpiry.toUTCString()}; path=/; SameSite=Lax`;
+
+          // Also set in cookies for middleware
+          document.cookie = `userId=${
+            data.id
+          }; expires=${tokenExpiry.toUTCString()}; path=/; SameSite=Lax`;
+          document.cookie = `username=${
+            data.username
+          }; expires=${tokenExpiry.toUTCString()}; path=/; SameSite=Lax`;
+        } catch (cookieError) {
+          console.error("Error setting cookies:", cookieError);
+        }
 
         // Redirect to app page
         router.push("/app");
@@ -244,22 +268,47 @@ export default function AuthForm() {
             username: formData.username,
             email: formData.email,
             password: formData.password,
+            confirmPassowrd: formData.confirmPassword,
           }),
+          credentials: "include", // Important: include credentials for cookies
         });
 
-        const data = await response.json();
-
+        // First check if the response is OK
         if (!response.ok) {
-          throw new Error(data.message || "Registration failed");
+          const errorData = await response.json();
+
+          throw new Error(errorData.errors || "Registration failed");
         }
 
-        // Store token in localStorage
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("refreshToken", data.refreshToken);
-        localStorage.setItem("tokenExpiration", data.tokenExpiration);
-        localStorage.setItem("userId", data.id);
-        localStorage.setItem("username", data.username);
-        localStorage.setItem("email", data.email);
+        // Parse response data
+        const data = await response.json();
+
+        // Check if we have a valid token
+        if (!data.token) {
+          throw new Error("No authentication token received from server");
+        }
+
+        // Clean the token if it has Bearer prefix
+        const cleanToken = data.token.startsWith("Bearer ")
+          ? data.token.substring(7)
+          : data.token;
+
+        try {
+          // Use the direct document.cookie approach for the token
+          const tokenExpiry = new Date();
+          tokenExpiry.setTime(tokenExpiry.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+          document.cookie = `token=${cleanToken}; expires=${tokenExpiry.toUTCString()}; path=/; SameSite=Lax`;
+
+          // Also set in cookies for middleware
+          document.cookie = `userId=${
+            data.id
+          }; expires=${tokenExpiry.toUTCString()}; path=/; SameSite=Lax`;
+          document.cookie = `username=${
+            data.username
+          }; expires=${tokenExpiry.toUTCString()}; path=/; SameSite=Lax`;
+        } catch (cookieError) {
+          console.error("Error setting cookies:", cookieError);
+        }
 
         // Redirect to app page
         router.push("/app");
@@ -273,6 +322,7 @@ export default function AuthForm() {
     }
   };
 
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: {

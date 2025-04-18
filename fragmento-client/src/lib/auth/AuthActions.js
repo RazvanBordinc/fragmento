@@ -13,6 +13,7 @@ export async function registerUserAction(formData) {
     email: formData.get("email"),
     username: formData.get("username"),
     password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
   };
 
   try {
@@ -28,7 +29,7 @@ export async function registerUserAction(formData) {
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: data.message || "Registration failed" };
+      return { success: false, error: data.errors || "Registration failed" };
     }
 
     return {

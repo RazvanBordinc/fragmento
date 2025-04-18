@@ -7,6 +7,25 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { registerUser } from "./AuthService";
 import { useAuth } from "./AuthContext";
+import { storeAuthData } from "./CookieService";
+
+/**
+ * Helper function to get property value regardless of casing (camelCase or PascalCase)
+ */
+const getProperty = (obj, camelCaseProp) => {
+  if (!obj) return undefined;
+
+  // Try camelCase first (e.g. "token")
+  if (obj[camelCaseProp] !== undefined) {
+    return obj[camelCaseProp];
+  }
+
+  // Try PascalCase (e.g. "Token")
+  const pascalCaseProp =
+    camelCaseProp.charAt(0).toUpperCase() + camelCaseProp.slice(1);
+  return obj[pascalCaseProp];
+};
+
 export default function RegisterForm() {
   const [userData, setUserData] = useState({
     email: "",
@@ -83,7 +102,7 @@ export default function RegisterForm() {
     setIsSubmitting(true);
 
     try {
-      // Create register payload (exclude confirmPassword)
+      // Create register payload
       const registerPayload = {
         email: userData.email,
         username: userData.username,
@@ -94,22 +113,58 @@ export default function RegisterForm() {
       // Call register API
       const response = await registerUser(registerPayload);
 
+      // Extract values using our helper function that checks both camelCase and PascalCase
+      const token = getProperty(response, "token");
+      const refreshToken = getProperty(response, "refreshToken");
+      const tokenExpiration = getProperty(response, "tokenExpiration");
+      const userId = getProperty(response, "id");
+      const username = getProperty(response, "username");
+      const email = getProperty(response, "email");
+
+      // Check if we have a valid token
+      if (!token) {
+        throw new Error(
+          "Invalid response from server. Missing authentication token."
+        );
+      }
+
+      // Store in cookies for middleware
+      try {
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 7); // 7 days
+
+        document.cookie = `token=${token}; path=/; expires=${expires.toUTCString()}`;
+        document.cookie = `userId=${userId}; path=/; expires=${expires.toUTCString()}`;
+        document.cookie = `username=${username}; path=/; expires=${expires.toUTCString()}`;
+      } catch (cookieError) {
+        console.error("Error setting cookies directly:", cookieError);
+      }
+
+      // Store auth data in both localStorage and cookies
+      storeAuthData({
+        id: userId,
+        username: username,
+        email: email,
+        token: token,
+        refreshToken: refreshToken,
+        tokenExpiration: tokenExpiration,
+      });
+
       // Update auth context
       login(
         {
-          id: response.id,
-          username: response.username,
-          email: response.email,
+          id: userId,
+          username: username,
+          email: email,
         },
-        response.token,
-        response.refreshToken,
-        response.tokenExpiration
+        token,
+        refreshToken,
+        tokenExpiration
       );
 
       // Redirect to app
       router.push("/app");
     } catch (error) {
-      console.error("Registration error:", error);
       setErrors({
         form: error.message || "Registration failed, please try again",
       });
