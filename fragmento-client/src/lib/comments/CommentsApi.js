@@ -65,9 +65,38 @@ const handleResponse = async (response) => {
     return { success: true };
   }
 
+  // Clone the response for debugging
+  const clonedResponse = response.clone();
+  try {
+    const textResponse = await clonedResponse.text();
+    console.log("API response text:", textResponse.substring(0, 200) + "...");
+  } catch (e) {
+    // Ignore error
+  }
+
   // Parse the response JSON
   const data = await response.json();
   return data;
+};
+
+/**
+ * Safely get property regardless of case
+ * @param {Object} obj - The object to get the property from
+ * @param {string} propName - The property name to get (camelCase)
+ * @param {any} defaultValue - The default value if property doesn't exist
+ * @returns {any} The property value or default
+ */
+const getProperty = (obj, propName, defaultValue = undefined) => {
+  if (!obj) return defaultValue;
+
+  // Try camelCase
+  if (obj[propName] !== undefined) return obj[propName];
+
+  // Try PascalCase
+  const pascalCase = propName.charAt(0).toUpperCase() + propName.slice(1);
+  if (obj[pascalCase] !== undefined) return obj[pascalCase];
+
+  return defaultValue;
 };
 
 /**
@@ -79,37 +108,31 @@ const handleResponse = async (response) => {
 const mapApiCommentToFrontend = (apiComment, currentUser) => {
   if (!apiComment) return null;
 
-  // Handle both camelCase and PascalCase property names
-  const user = apiComment.user || apiComment.User || {};
-  const replies = apiComment.replies || apiComment.Replies || [];
+  const user = getProperty(apiComment, "user", {});
+  const replies = getProperty(apiComment, "replies", []);
 
   return {
-    id: apiComment.id || apiComment.Id || "",
-    userId: user.id || user.Id || "",
-    username: user.username || user.Username || "",
-    profilePic: user.profilePictureUrl || user.ProfilePictureUrl || null,
-    text: apiComment.text || apiComment.Text || "",
-    timestamp:
-      apiComment.createdAt || apiComment.CreatedAt || new Date().toISOString(),
-    createdAt:
-      apiComment.createdAt || apiComment.CreatedAt || new Date().toISOString(),
-    updatedAt: apiComment.updatedAt || apiComment.UpdatedAt || null,
-    likes: apiComment.likesCount || apiComment.LikesCount || 0,
-    likesCount: apiComment.likesCount || apiComment.LikesCount || 0,
-    repliesCount: apiComment.repliesCount || apiComment.RepliesCount || 0,
-    isLiked:
-      apiComment.isLikedByCurrentUser ||
-      apiComment.IsLikedByCurrentUser ||
-      false,
-    isLikedByCurrentUser:
-      apiComment.isLikedByCurrentUser ||
-      apiComment.IsLikedByCurrentUser ||
-      false,
-    canEdit: apiComment.canEdit || apiComment.CanEdit || false,
-    canDelete: apiComment.canDelete || apiComment.CanDelete || false,
-    user: user,
-    parentCommentId:
-      apiComment.parentCommentId || apiComment.ParentCommentId || null,
+    id: getProperty(apiComment, "id", ""),
+    userId: getProperty(user, "id", ""),
+    user: {
+      id: getProperty(user, "id", ""),
+      username: getProperty(user, "username", "unknown"),
+      profilePictureUrl: getProperty(user, "profilePictureUrl", null),
+    },
+    text: getProperty(apiComment, "text", ""),
+    createdAt: getProperty(apiComment, "createdAt", new Date().toISOString()),
+    updatedAt: getProperty(apiComment, "updatedAt", null),
+    likesCount: getProperty(apiComment, "likesCount", 0),
+    repliesCount: getProperty(apiComment, "repliesCount", 0),
+    isLiked: getProperty(apiComment, "isLikedByCurrentUser", false),
+    isLikedByCurrentUser: getProperty(
+      apiComment,
+      "isLikedByCurrentUser",
+      false
+    ),
+    canEdit: getProperty(apiComment, "canEdit", false),
+    canDelete: getProperty(apiComment, "canDelete", false),
+    parentCommentId: getProperty(apiComment, "parentCommentId", null),
     replies: Array.isArray(replies)
       ? replies.map((reply) => mapApiCommentToFrontend(reply, currentUser))
       : [],
@@ -136,6 +159,11 @@ export const CommentsApi = {
   // Get comments for a post with pagination and filtering
   getComments: async (postId, options = {}) => {
     try {
+      console.log(
+        `Fetching comments for post ${postId} with options:`,
+        options
+      );
+
       const {
         page = 1,
         pageSize = 10,
@@ -156,6 +184,9 @@ export const CommentsApi = {
         `${API_BASE_URL}/comments/post/${postId}?${queryParams}`,
         buildRequestOptions()
       );
+
+      console.log(`Comments response status: ${response.status}`);
+
       return handleResponse(response);
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -166,6 +197,11 @@ export const CommentsApi = {
   // Get replies for a comment
   getReplies: async (commentId, options = {}) => {
     try {
+      console.log(
+        `Fetching replies for comment ${commentId} with options:`,
+        options
+      );
+
       const {
         page = 1,
         pageSize = 10,
@@ -184,6 +220,9 @@ export const CommentsApi = {
         `${API_BASE_URL}/comments/${commentId}/replies?${queryParams}`,
         buildRequestOptions()
       );
+
+      console.log(`Replies response status: ${response.status}`);
+
       return handleResponse(response);
     } catch (error) {
       console.error("Error fetching replies:", error);
@@ -194,10 +233,15 @@ export const CommentsApi = {
   // Create a new comment
   createComment: async (comment) => {
     try {
+      console.log("Creating comment:", comment);
+
       const response = await fetch(
         `${API_BASE_URL}/comments`,
         buildRequestOptions("POST", comment)
       );
+
+      console.log(`Create comment response status: ${response.status}`);
+
       return handleResponse(response);
     } catch (error) {
       console.error("Error creating comment:", error);
@@ -208,6 +252,8 @@ export const CommentsApi = {
   // Update an existing comment
   updateComment: async (commentId, comment) => {
     try {
+      console.log(`Updating comment ${commentId}:`, comment);
+
       // Make sure we're sending what the API expects - just the text in an object
       const updateData = {
         text: typeof comment === "string" ? comment : comment.text,
@@ -217,6 +263,8 @@ export const CommentsApi = {
         `${API_BASE_URL}/comments/${commentId}`,
         buildRequestOptions("PUT", updateData)
       );
+
+      console.log(`Update comment response status: ${response.status}`);
 
       if (!response.ok) {
         let errorMessage = "Failed to update comment";
@@ -244,10 +292,14 @@ export const CommentsApi = {
   // Delete a comment
   deleteComment: async (commentId) => {
     try {
+      console.log(`Deleting comment ${commentId}`);
+
       const response = await fetch(
         `${API_BASE_URL}/comments/${commentId}`,
         buildRequestOptions("DELETE")
       );
+
+      console.log(`Delete comment response status: ${response.status}`);
 
       if (!response.ok) {
         let errorMessage = "Failed to delete comment";
@@ -270,10 +322,15 @@ export const CommentsApi = {
   // Like a comment
   likeComment: async (commentId) => {
     try {
+      console.log(`Liking comment ${commentId}`);
+
       const response = await fetch(
         `${API_BASE_URL}/comments/${commentId}/like`,
         buildRequestOptions("POST")
       );
+
+      console.log(`Like comment response status: ${response.status}`);
+
       return handleResponse(response);
     } catch (error) {
       console.error("Error liking comment:", error);
@@ -284,10 +341,15 @@ export const CommentsApi = {
   // Unlike a comment
   unlikeComment: async (commentId) => {
     try {
+      console.log(`Unliking comment ${commentId}`);
+
       const response = await fetch(
         `${API_BASE_URL}/comments/${commentId}/like`,
         buildRequestOptions("DELETE")
       );
+
+      console.log(`Unlike comment response status: ${response.status}`);
+
       return handleResponse(response);
     } catch (error) {
       console.error("Error unliking comment:", error);

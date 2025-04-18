@@ -16,6 +16,7 @@ const Comment = ({
   formatTimestamp,
   isProcessing = false,
   hasLoadedAllReplies = false,
+  level = 0, // Add a level prop to track nesting depth
 }) => {
   // States for editing
   const [isEditing, setIsEditing] = useState(false);
@@ -26,11 +27,15 @@ const Comment = ({
   // Check if current user is the owner of the comment (can edit/delete)
   const isOwnComment =
     comment.canEdit ||
+    comment.isOwner ||
     comment.userId === currentUser?.id ||
     comment.user?.id === currentUser?.id;
 
-  // Check if comment is liked by current user
+  // Check if comment is liked by current user - use BOTH properties to ensure compatibility
   const isLiked = comment.isLiked || comment.isLikedByCurrentUser;
+
+  // Maximum nesting level to prevent excessive nesting
+  const MAX_NESTING_LEVEL = 3;
 
   // Load nested replies if needed
   useEffect(() => {
@@ -106,13 +111,16 @@ const Comment = ({
     }
   };
 
+  // Calculate indentation for nested replies
+  const indentClass = level > 0 ? `ml-${Math.min(level * 4, 12)}` : "";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       layout
-      className="flex items-start gap-2"
+      className={`flex items-start gap-2 ${indentClass}`}
     >
       {/* User avatar */}
       <Link
@@ -237,21 +245,23 @@ const Comment = ({
             </span>
           </button>
 
-          {/* Reply button */}
-          <button
-            className="flex items-center text-zinc-500 hover:text-zinc-400 cursor-pointer"
-            onClick={() =>
-              onReply(comment.id, comment.user?.username || comment.username)
-            }
-          >
-            <motion.div
-              whileTap={{ scale: 1.3 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          {/* Reply button - only show if below max nesting level */}
+          {level < MAX_NESTING_LEVEL && (
+            <button
+              className="flex items-center text-zinc-500 hover:text-zinc-400 cursor-pointer"
+              onClick={() =>
+                onReply(comment.id, comment.user?.username || comment.username)
+              }
             >
-              <Reply size={12} />
-            </motion.div>
-            <span className="ml-1">Reply</span>
-          </button>
+              <motion.div
+                whileTap={{ scale: 1.3 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
+                <Reply size={12} />
+              </motion.div>
+              <span className="ml-1">Reply</span>
+            </button>
+          )}
 
           {/* Edit button - only shown for own comments */}
           {isOwnComment && !isEditing && (
@@ -292,9 +302,9 @@ const Comment = ({
           )}
         </div>
 
-        {/* Nested replies */}
+        {/* Nested replies with proper indentation */}
         {comment.repliesCount > 0 && (
-          <div className="ml-4 mt-2 space-y-2">
+          <div className="mt-2 space-y-2">
             {/* Loading indicator for replies */}
             {isProcessing &&
               (!comment.replies ||
@@ -305,7 +315,7 @@ const Comment = ({
                 </div>
               )}
 
-            {/* Render existing replies */}
+            {/* Render existing replies with incremented level */}
             {comment.replies && comment.replies.length > 0 && (
               <>
                 {comment.replies.map((reply) => (
@@ -316,10 +326,12 @@ const Comment = ({
                       // Ensure these properties are correctly passed to nested replies
                       canEdit:
                         reply.canEdit ||
+                        reply.isOwner ||
                         reply.userId === currentUser?.id ||
                         reply.user?.id === currentUser?.id,
                       canDelete:
                         reply.canDelete ||
+                        reply.isOwner ||
                         reply.userId === currentUser?.id ||
                         reply.user?.id === currentUser?.id,
                     }}
@@ -331,6 +343,7 @@ const Comment = ({
                     formatTimestamp={formatTimestamp}
                     isProcessing={isProcessing && reply.id === comment.id}
                     hasLoadedAllReplies={hasLoadedAllReplies}
+                    level={level + 1} // Increment nesting level
                   />
                 ))}
               </>

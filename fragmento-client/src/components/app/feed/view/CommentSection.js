@@ -67,11 +67,54 @@ export default function CommentsSection({
         }
       });
 
-      setComments(initialComments);
+      setComments(normalizeComments(initialComments));
       setCommentsInitialized(true);
       setTotalComments(initialComments.length);
     }
   }, [initialComments, commentsInitialized]);
+
+  // Function to normalize comments and ensure consistent structure
+  const normalizeComments = (commentsArray) => {
+    if (!Array.isArray(commentsArray)) return [];
+
+    return commentsArray.map((comment) => {
+      // Ensure each comment has all required properties with fallbacks
+      const normalizedComment = {
+        id: comment.id || "",
+        text: comment.text || "",
+        createdAt:
+          comment.createdAt || comment.timestamp || new Date().toISOString(),
+        updatedAt: comment.updatedAt || null,
+        likesCount: comment.likesCount || comment.likes || 0,
+        repliesCount: comment.repliesCount || 0,
+        isLiked: comment.isLiked || comment.isLikedByCurrentUser || false,
+        isLikedByCurrentUser: comment.isLikedByCurrentUser || false,
+        canEdit:
+          comment.canEdit ||
+          comment.userId === currentUser?.id ||
+          comment.user?.id === currentUser?.id ||
+          false,
+        canDelete:
+          comment.canDelete ||
+          comment.userId === currentUser?.id ||
+          comment.user?.id === currentUser?.id ||
+          false,
+        // Ensure user object is consistent
+        user: {
+          id: comment.user?.id || comment.userId || "",
+          username: comment.user?.username || comment.username || "unknown",
+          profilePictureUrl:
+            comment.user?.profilePictureUrl || comment.profilePic || null,
+        },
+        // Handle replies recursively if they exist
+        replies: Array.isArray(comment.replies)
+          ? normalizeComments(comment.replies)
+          : [],
+      };
+
+      return normalizedComment;
+    });
+  };
 
   // Fetch comments when expanded for the first time
   useEffect(() => {
@@ -151,9 +194,11 @@ export default function CommentsSection({
       const hasNextPageFlag =
         response.hasNextPage || response.HasNextPage || false;
 
-      // Map API data to frontend format
-      const mappedComments = commentsData.map((comment) =>
-        CommentsApi.mapApiCommentToFrontend(comment, currentUser)
+      // Map API data to frontend format with consistent structure
+      const mappedComments = normalizeComments(
+        commentsData.map((comment) =>
+          CommentsApi.mapApiCommentToFrontend(comment, currentUser)
+        )
       );
 
       // Check which comments already have their full replies loaded
@@ -231,31 +276,12 @@ export default function CommentsSection({
       if (replyingTo) {
         // Add as a reply to an existing comment
         setComments((prevComments) => {
-          // Create a deep copy to avoid mutation issues
-          const deepCopy = JSON.parse(JSON.stringify(prevComments));
-
-          // Helper function to find and update a comment at any nesting level
-          const addReplyToComment = (comments, targetId) => {
-            for (let i = 0; i < comments.length; i++) {
-              if (comments[i].id === targetId) {
-                if (!comments[i].replies) {
-                  comments[i].replies = [];
-                }
-                comments[i].replies.unshift(newCommentFormatted);
-                comments[i].repliesCount = (comments[i].repliesCount || 0) + 1;
-                return true;
-              }
-
-              if (comments[i].replies && comments[i].replies.length > 0) {
-                const found = addReplyToComment(comments[i].replies, targetId);
-                if (found) return true;
-              }
-            }
-            return false;
-          };
-
-          addReplyToComment(deepCopy, replyingTo);
-          return deepCopy;
+          // Use a deep update function to maintain the tree structure
+          return updateCommentTreeForReply(
+            prevComments,
+            replyingTo,
+            newCommentFormatted
+          );
         });
 
         // Reset reply state
@@ -263,7 +289,10 @@ export default function CommentsSection({
         setReplyUsername("");
       } else {
         // Add as a new top-level comment
-        setComments((prevComments) => [newCommentFormatted, ...prevComments]);
+        setComments((prevComments) => [
+          normalizeComments([newCommentFormatted])[0],
+          ...prevComments,
+        ]);
 
         // Increment total count
         setTotalComments((prev) => prev + 1);
@@ -278,6 +307,39 @@ export default function CommentsSection({
     } finally {
       setSubmittingComment(false);
     }
+  };
+
+  // Better function to update the comment tree when adding a reply
+  const updateCommentTreeForReply = (comments, parentId, newReply) => {
+    return comments.map((comment) => {
+      if (comment.id === parentId) {
+        // This is the parent comment, add the reply to it
+        const updatedComment = {
+          ...comment,
+          replies: [
+            normalizeComments([newReply])[0],
+            ...(comment.replies || []),
+          ],
+          repliesCount: (comment.repliesCount || 0) + 1,
+        };
+        return updatedComment;
+      }
+
+      // If this comment has replies, recursively check them
+      if (comment.replies && comment.replies.length > 0) {
+        return {
+          ...comment,
+          replies: updateCommentTreeForReply(
+            comment.replies,
+            parentId,
+            newReply
+          ),
+        };
+      }
+
+      // No match, return the comment unchanged
+      return comment;
+    });
   };
 
   // Handle liking a comment
@@ -373,29 +435,70 @@ export default function CommentsSection({
         try {
           await CommentsApi.deleteComment(commentId);
 
-          // Check if this is a top-level comment
+          // Find the comment and determine if it's a top-level comment
           const isTopLevel = comments.some((c) => c.id === commentId);
 
-          // Remove comment from state
+          // Find the parent comment ID if it's a reply
+          let parentCommentId = null;
+          for (const comment of comments) {
+            if (
+              comment.replies &&
+              comment.replies.some((r) => r.id === commentId)
+            ) {
+              parentCommentId = comment.id;
+              break;
+            }
+          }
+
+          // Remove comment from state - with proper tree structure maintenance
           setComments((prevComments) => {
-            return prevComments.filter((comment) => {
-              if (comment.id === commentId) {
-                return false; // Remove this comment
+            // First, check if it's a top-level comment
+            const filteredTopLevel = prevComments.filter(
+              (c) => c.id !== commentId
+            );
+
+            if (filteredTopLevel.length !== prevComments.length) {
+              // It was a top-level comment
+              return filteredTopLevel;
+            }
+
+            // It's a nested comment, so we need to update the tree
+            return prevComments.map((comment) => {
+              if (
+                comment.replies &&
+                comment.replies.some((r) => r.id === commentId)
+              ) {
+                // This comment contains the reply we want to delete
+                return {
+                  ...comment,
+                  replies: comment.replies.filter((r) => r.id !== commentId),
+                  repliesCount: comment.repliesCount - 1,
+                };
               }
 
-              // Also check for and update replies
-              if (comment.replies && comment.replies.length) {
-                comment.replies = comment.replies.filter(
-                  (reply) => reply.id !== commentId
-                );
-
-                // Update the replies count if needed
-                if (comment.replies.length !== comment.repliesCount) {
-                  comment.repliesCount = comment.replies.length;
-                }
+              // If this comment has replies, recursively check them
+              if (comment.replies && comment.replies.length > 0) {
+                return {
+                  ...comment,
+                  replies: comment.replies.map((reply) => {
+                    if (
+                      reply.replies &&
+                      reply.replies.some((r) => r.id === commentId)
+                    ) {
+                      return {
+                        ...reply,
+                        replies: reply.replies.filter(
+                          (r) => r.id !== commentId
+                        ),
+                        repliesCount: reply.repliesCount - 1,
+                      };
+                    }
+                    return reply;
+                  }),
+                };
               }
 
-              return true;
+              return comment;
             });
           });
 
@@ -514,34 +617,47 @@ export default function CommentsSection({
       // Handle both camelCase and PascalCase property names
       const repliesData = response.comments || response.Comments || [];
 
-      // Map replies to frontend format
-      const mappedReplies = repliesData.map((reply) =>
-        CommentsApi.mapApiCommentToFrontend(reply, currentUser)
+      // Map replies to frontend format with consistent structure
+      const mappedReplies = normalizeComments(
+        repliesData.map((reply) =>
+          CommentsApi.mapApiCommentToFrontend(reply, currentUser)
+        )
       );
 
       // Update comments state to include all replies
       setComments((prevComments) => {
-        // Deep copy the comments
-        const updatedComments = JSON.parse(JSON.stringify(prevComments));
+        return prevComments.map((comment) => {
+          if (comment.id === commentId) {
+            // Found the parent comment, update its replies
+            return {
+              ...comment,
+              replies: mappedReplies,
+            };
+          }
 
-        // Find and update the comment with new replies
-        const updateCommentReplies = (comments, targetId) => {
-          for (let i = 0; i < comments.length; i++) {
-            if (comments[i].id === targetId) {
-              comments[i].replies = mappedReplies;
-              return true;
-            }
+          // If this comment has replies, recursively check them
+          if (comment.replies && comment.replies.length > 0) {
+            const updatedReplies = comment.replies.map((reply) => {
+              if (reply.id === commentId) {
+                return {
+                  ...reply,
+                  replies: mappedReplies,
+                };
+              }
+              return reply;
+            });
 
-            if (comments[i].replies && comments[i].replies.length > 0) {
-              const found = updateCommentReplies(comments[i].replies, targetId);
-              if (found) return true;
+            // Check if any replies were updated
+            if (updatedReplies.some((r, i) => r !== comment.replies[i])) {
+              return {
+                ...comment,
+                replies: updatedReplies,
+              };
             }
           }
-          return false;
-        };
 
-        updateCommentReplies(updatedComments, commentId);
-        return updatedComments;
+          return comment;
+        });
       });
 
       // Mark this comment as having loaded all replies

@@ -61,6 +61,12 @@ namespace Fragmento_server.Controllers
                     .ThenInclude(r => r.User)
                 .Include(c => c.Replies)
                     .ThenInclude(r => r.Likes)
+                .Include(c => c.Replies) // Ensure we can see nested replies
+                    .ThenInclude(r => r.Replies)
+                        .ThenInclude(r2 => r2.User)
+                .Include(c => c.Replies)
+                    .ThenInclude(r => r.Replies)
+                        .ThenInclude(r2 => r2.Likes)
                 .Where(c => c.PostId == postId);
 
             // Apply filter for top-level comments only if requested
@@ -92,7 +98,7 @@ namespace Fragmento_server.Controllers
 
             // Check if current user has liked comments
             Guid? currentUserId = null;
-            if (User.Identity.IsAuthenticated)
+            if (User.Identity?.IsAuthenticated == true)
             {
                 currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
             }
@@ -116,7 +122,6 @@ namespace Fragmento_server.Controllers
                 CanEdit = currentUserId.HasValue && c.UserId == currentUserId,
                 CanDelete = currentUserId.HasValue && c.UserId == currentUserId,
                 Replies = c.Replies.OrderByDescending(r => r.CreatedAt)
-                    .Take(3) // Only get top 3 replies initially
                     .Select(r => new CommentResponse
                     {
                         Id = r.Id.ToString(),
@@ -128,8 +133,31 @@ namespace Fragmento_server.Controllers
                         },
                         Text = r.Text,
                         CreatedAt = r.CreatedAt,
+                        UpdatedAt = r.UpdatedAt,
                         LikesCount = r.Likes.Count,
-                        RepliesCount = r.Replies.Count
+                        RepliesCount = r.Replies.Count,
+                        IsLiked = currentUserId.HasValue && r.Likes.Any(l => l.UserId == currentUserId), // Correctly set isLiked
+                        IsOwner = currentUserId.HasValue && r.UserId == currentUserId,
+                        // Include nested replies (up to 3 levels)
+                        Replies = r.Replies.OrderByDescending(r2 => r2.CreatedAt)
+                            .Select(r2 => new CommentResponse
+                            {
+                                Id = r2.Id.ToString(),
+                                User = new UserBriefResponse
+                                {
+                                    Id = r2.User.Id.ToString(),
+                                    Username = r2.User.Username,
+                                    ProfilePictureUrl = r2.User.ProfilePictureUrl
+                                },
+                                Text = r2.Text,
+                                CreatedAt = r2.CreatedAt,
+                                UpdatedAt = r2.UpdatedAt,
+                                LikesCount = r2.Likes.Count,
+                                RepliesCount = 0, // No deeper nesting
+                                IsLiked = currentUserId.HasValue && r2.Likes.Any(l => l.UserId == currentUserId),
+                                IsOwner = currentUserId.HasValue && r2.UserId == currentUserId,
+                                Replies = new List<CommentResponse>() // Empty list for deepest level
+                            }).ToList()
                     }).ToList()
             }).ToList();
 
@@ -171,11 +199,14 @@ namespace Fragmento_server.Controllers
             if (request.PageSize < 1) request.PageSize = 10;
             if (request.PageSize > 50) request.PageSize = 50; // Maximum page size
 
-            // Get replies query
+            // Get replies query with nested replies included
             var repliesQuery = _context.Comments
                 .Include(c => c.User)
                 .Include(c => c.Likes)
-                .Include(c => c.Replies)
+                .Include(c => c.Replies) // Include nested replies
+                    .ThenInclude(r => r.User)
+                .Include(c => c.Replies) // Include likes on nested replies
+                    .ThenInclude(r => r.Likes)
                 .Where(c => c.ParentCommentId == commentId);
 
             // Apply sorting
@@ -201,12 +232,12 @@ namespace Fragmento_server.Controllers
 
             // Check if current user has liked replies
             Guid? currentUserId = null;
-            if (User.Identity.IsAuthenticated)
+            if (User.Identity?.IsAuthenticated == true)
             {
                 currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
             }
 
-            // Map to response
+            // Map to response with proper nesting of replies
             var replyResponses = replies.Select(r => new CommentDetailResponse
             {
                 Id = r.Id.ToString(),
@@ -224,7 +255,26 @@ namespace Fragmento_server.Controllers
                 IsLikedByCurrentUser = currentUserId.HasValue && r.Likes.Any(l => l.UserId == currentUserId),
                 CanEdit = currentUserId.HasValue && r.UserId == currentUserId,
                 CanDelete = currentUserId.HasValue && r.UserId == currentUserId,
-                Replies = new List<CommentResponse>() // No nested replies in this view
+                // Include nested replies with proper properties
+                Replies = r.Replies.OrderByDescending(nr => nr.CreatedAt)
+                    .Select(nr => new CommentResponse
+                    {
+                        Id = nr.Id.ToString(),
+                        User = new UserBriefResponse
+                        {
+                            Id = nr.User.Id.ToString(),
+                            Username = nr.User.Username,
+                            ProfilePictureUrl = nr.User.ProfilePictureUrl
+                        },
+                        Text = nr.Text,
+                        CreatedAt = nr.CreatedAt,
+                        UpdatedAt = nr.UpdatedAt,
+                        LikesCount = nr.Likes.Count,
+                        RepliesCount = 0, // We don't support deeper nesting
+                        IsLiked = currentUserId.HasValue && nr.Likes.Any(l => l.UserId == currentUserId),
+                        IsOwner = currentUserId.HasValue && nr.UserId == currentUserId,
+                        Replies = new List<CommentResponse>() // Empty list for the deepest level
+                    }).ToList()
             }).ToList();
 
             var response = new CommentPaginatedResponse
@@ -364,7 +414,7 @@ namespace Fragmento_server.Controllers
                 IsLikedByCurrentUser = false,
                 CanEdit = true,
                 CanDelete = true,
-                Replies = new List<CommentResponse>()
+                Replies = new List<CommentResponse>() // Initialize with empty list of CommentResponse
             };
 
             _logger.LogInformation($"Comment created successfully with ID: {comment.Id}");
@@ -421,10 +471,8 @@ namespace Fragmento_server.Controllers
 
             var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-            var comment = await _context.Comments
-                .Include(c => c.Replies)
-                .FirstOrDefaultAsync(c => c.Id == id);
-
+            // Use separate queries to avoid issues with entity tracking
+            var comment = await _context.Comments.FindAsync(id);
             if (comment == null)
             {
                 _logger.LogWarning($"Comment {id} not found");
@@ -438,36 +486,38 @@ namespace Fragmento_server.Controllers
                 return Forbid("You do not have permission to delete this comment");
             }
 
-            // Delete related entities first
-            var commentLikes = await _context.CommentLikes.Where(cl => cl.CommentId == id).ToListAsync();
+            // Find all replies to this comment
+            var replies = await _context.Comments
+                .Where(c => c.ParentCommentId == id)
+                .ToListAsync();
+
+            // Update replies to be top-level comments
+            foreach (var reply in replies)
+            {
+                reply.ParentCommentId = null;
+                _context.Comments.Update(reply);
+            }
+
+            // Delete related entities
+            var commentLikes = await _context.CommentLikes
+                .Where(cl => cl.CommentId == id)
+                .ToListAsync();
             _context.CommentLikes.RemoveRange(commentLikes);
 
-            // Check if there are any replies to this comment
-            if (comment.Replies.Any())
-            {
-                // For replies, don't actually delete them, just update text
-                comment.Text = "[deleted]";
-                comment.UpdatedAt = DateTime.UtcNow;
+            // Delete notifications related to this comment
+            var notifications = await _context.Notifications
+                .Where(n => n.CommentId == id)
+                .ToListAsync();
+            _context.Notifications.RemoveRange(notifications);
 
-                _logger.LogInformation($"Comment {id} marked as deleted (has replies)");
-            }
-            else
-            {
-                // Delete notifications related to this comment
-                var notifications = await _context.Notifications
-                    .Where(n => n.CommentId == id)
-                    .ToListAsync();
-                _context.Notifications.RemoveRange(notifications);
+            // Remove the comment - MAKE SURE THIS EXECUTES
+            _context.Comments.Remove(comment);
 
-                // Actually delete the comment
-                _context.Comments.Remove(comment);
+            // Save all changes
+            var saveResult = await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Comment {id} deleted completely");
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Comment deleted successfully" });
+            _logger.LogInformation($"Comment {id} deleted successfully. SaveChanges result: {saveResult}");
+            return Ok(new { message= "Comment deleted successfully", affectedRecords= saveResult });
         }
 
         // POST: api/comments/{id}/like
