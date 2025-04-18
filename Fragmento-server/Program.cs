@@ -23,7 +23,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFragmentoClient", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // Your Next.js app
+        policy.WithOrigins("http://localhost:3000")  
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -34,11 +34,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddFragmentoRateLimiting();
 
 // Add Authentication
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme) // Specify default scheme
 .AddJwtBearer(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
@@ -51,8 +47,19 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
-});
 
+    // Handle authentication failures gracefully
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            // Log authentication failures but don't necessarily fail the request
+            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        }
+    };
+});
+builder.Services.AddAuthorization();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -94,6 +101,11 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -103,8 +115,6 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
     app.MapOpenApi();
 }
-
-app.UseHttpsRedirection();
 
 // Use CORS
 app.UseCors("AllowFragmentoClient");

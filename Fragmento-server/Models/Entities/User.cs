@@ -25,14 +25,14 @@ namespace Fragmento_server.Models.Entities
         public string PasswordHash { get; set; }
 
         [StringLength(1000)]
-        public string Bio { get; set; }
+        public string Bio { get; set; } = string.Empty;
 
         // Profile picture and cover photo URLs
         [StringLength(500)]
-        public string ProfilePictureUrl { get; set; }
+        public string ProfilePictureUrl { get; set; } = string.Empty;
 
         [StringLength(500)]
-        public string CoverPictureUrl { get; set; }
+        public string CoverPictureUrl { get; set; } = string.Empty;
 
         // Registration date
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

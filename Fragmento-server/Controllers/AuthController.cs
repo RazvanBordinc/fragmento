@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Fragmento_server.Services.Interfaces;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace Fragmento_server.Controllers
 {
@@ -163,7 +164,13 @@ namespace Fragmento_server.Controllers
 
             _context.RefreshTokens.Add(refreshTokenEntity);
             await _context.SaveChangesAsync();
-
+            Response.Cookies.Append("token", token, new CookieOptions
+            {
+                HttpOnly = false, // Set to true in production
+                Expires = DateTime.UtcNow.AddMinutes(60),
+                SameSite = SameSiteMode.Lax,
+                Path = "/"
+            });
             // Return user info and tokens
             return Ok(new AuthResponse
             {
@@ -239,7 +246,13 @@ namespace Fragmento_server.Controllers
 
                 _context.RefreshTokens.Add(refreshTokenEntity);
                 await _context.SaveChangesAsync();
-
+                Response.Cookies.Append("token", newAccessToken, new CookieOptions
+                {
+                    HttpOnly = false,
+                    Expires = tokenExpiration,
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/"
+                });
                 // Return new tokens
                 return Ok(new AuthResponse
                 {
@@ -259,32 +272,45 @@ namespace Fragmento_server.Controllers
 
         // POST: api/auth/logout
         [HttpPost("logout")]
-        [Authorize]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Explicitly specify scheme
         [EnableRateLimiting("auth")]
         public async Task<IActionResult> Logout(RefreshTokenRequest request)
         {
-            // Get current user id from token
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            try
             {
-                return Unauthorized(new { message = "Invalid token" });
+                // Get current user id from token
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { message = "Invalid token" });
+                }
+
+                // Find and revoke the refresh token
+                var refreshToken = await _context.RefreshTokens
+                    .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken &&
+                                              rt.UserId == Guid.Parse(userId) &&
+                                              !rt.IsRevoked);
+
+                if (refreshToken != null)
+                {
+                    refreshToken.IsRevoked = true;
+                    await _context.SaveChangesAsync();
+                }
+
+                // Clear auth cookies if present
+                Response.Cookies.Delete("token");
+                Response.Cookies.Delete("userId");
+                Response.Cookies.Delete("username");
+
+                return Ok(new { message = "Logged out successfully" });
             }
-
-            // Find and revoke the refresh token
-            var refreshToken = await _context.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken &&
-                                          rt.UserId == Guid.Parse(userId) &&
-                                          !rt.IsRevoked);
-
-            if (refreshToken != null)
+            catch (Exception ex)
             {
-                refreshToken.IsRevoked = true;
-                await _context.SaveChangesAsync();
+                // Log the error but still return success to allow frontend to clean up
+            
+                return Ok(new { message = "Logged out successfully" });
             }
-
-            return Ok(new { message = "Logged out successfully" });
         }
-
         // POST: api/auth/change-password
         [HttpPost("change-password")]
         [Authorize]
