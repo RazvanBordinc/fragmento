@@ -16,13 +16,12 @@ const Comment = ({
   formatTimestamp,
   isProcessing = false,
   hasLoadedAllReplies = false,
-  level = 0, // Add a level prop to track nesting depth
+  level = 0, // Track nesting depth
 }) => {
   // States for editing
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(comment.text);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
-  const [loadingReplies, setLoadingReplies] = useState(false);
 
   // Check if current user is the owner of the comment (can edit/delete)
   const isOwnComment =
@@ -31,16 +30,15 @@ const Comment = ({
     comment.userId === currentUser?.id ||
     comment.user?.id === currentUser?.id;
 
-  // Check if comment is liked by current user - use BOTH properties to ensure compatibility
+  // Check if comment is liked by current user - check BOTH properties to handle inconsistencies
   const isLiked = comment.isLiked || comment.isLikedByCurrentUser;
 
   // Maximum nesting level to prevent excessive nesting
-  const MAX_NESTING_LEVEL = 3;
+  const MAX_NESTING_LEVEL = 5;
 
   // Load nested replies if needed
   useEffect(() => {
-    // If this comment has replies but they're not fully loaded,
-    // and we haven't already loaded them
+    // If this comment has replies but they're not loaded and we haven't already tried loading them
     if (
       comment.repliesCount > 0 &&
       (!comment.replies || comment.replies.length < comment.repliesCount) &&
@@ -48,6 +46,12 @@ const Comment = ({
       !isProcessing &&
       onLoadReplies
     ) {
+      console.log(
+        `Comment ${comment.id} has ${comment.repliesCount} replies but only ${
+          comment.replies?.length || 0
+        } are loaded. Loading more replies.`
+      );
+
       // Load the replies
       onLoadReplies(comment.id);
     }
@@ -97,11 +101,12 @@ const Comment = ({
     setIsSubmittingEdit(true);
 
     try {
-      // Just send the text string directly
+      // Send the edit request to the API
       await CommentsApi.updateComment(comment.id, editText);
 
       // Update local state
       comment.text = editText;
+      comment.updatedAt = new Date().toISOString(); // Add updated timestamp
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating comment:", error);
@@ -111,8 +116,23 @@ const Comment = ({
     }
   };
 
+  // Handle like button click - delegate to parent
+  const handleLike = () => {
+    if (!isProcessing && onLike) {
+      onLike(comment.id);
+    }
+  };
+
   // Calculate indentation for nested replies
   const indentClass = level > 0 ? `ml-${Math.min(level * 4, 12)}` : "";
+
+  // Debug info for tracing nested replies
+  const hasNestedReplies = comment.replies && comment.replies.length > 0;
+  if (hasNestedReplies) {
+    console.log(
+      `Comment ${comment.id} at level ${level} has ${comment.replies.length} replies`
+    );
+  }
 
   return (
     <motion.div
@@ -227,7 +247,7 @@ const Comment = ({
             className={`flex items-center cursor-pointer ${
               isLiked ? "text-red-500" : "text-zinc-500 hover:text-zinc-400"
             } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
-            onClick={() => !isProcessing && onLike(comment.id)}
+            onClick={handleLike}
             disabled={isProcessing}
           >
             <motion.div
@@ -304,7 +324,7 @@ const Comment = ({
 
         {/* Nested replies with proper indentation */}
         {comment.repliesCount > 0 && (
-          <div className="mt-2 space-y-2">
+          <div className="mt-3 space-y-3">
             {/* Loading indicator for replies */}
             {isProcessing &&
               (!comment.replies ||
@@ -334,6 +354,11 @@ const Comment = ({
                         reply.isOwner ||
                         reply.userId === currentUser?.id ||
                         reply.user?.id === currentUser?.id,
+                      // Ensure both isLiked and isLikedByCurrentUser are set correctly
+                      isLiked:
+                        reply.isLiked || reply.isLikedByCurrentUser || false,
+                      isLikedByCurrentUser:
+                        reply.isLiked || reply.isLikedByCurrentUser || false,
                     }}
                     currentUser={currentUser}
                     onLike={onLike}

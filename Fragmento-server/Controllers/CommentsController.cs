@@ -53,20 +53,10 @@ namespace Fragmento_server.Controllers
             if (request.PageSize < 1) request.PageSize = 10;
             if (request.PageSize > 50) request.PageSize = 50; // Maximum page size
 
-            // Get comments query
+            // Get comments query - we'll load top-level comments first
             var commentsQuery = _context.Comments
                 .Include(c => c.User)
                 .Include(c => c.Likes)
-                .Include(c => c.Replies)
-                    .ThenInclude(r => r.User)
-                .Include(c => c.Replies)
-                    .ThenInclude(r => r.Likes)
-                .Include(c => c.Replies) // Ensure we can see nested replies
-                    .ThenInclude(r => r.Replies)
-                        .ThenInclude(r2 => r2.User)
-                .Include(c => c.Replies)
-                    .ThenInclude(r => r.Replies)
-                        .ThenInclude(r2 => r2.Likes)
                 .Where(c => c.PostId == postId);
 
             // Apply filter for top-level comments only if requested
@@ -90,75 +80,46 @@ namespace Fragmento_server.Controllers
             var totalComments = await commentsQuery.CountAsync();
             var totalPages = (int)Math.Ceiling(totalComments / (double)request.PageSize);
 
-            // Apply pagination
+            // Apply pagination and fetch the comments
             var comments = await commentsQuery
                 .Skip((request.Page - 1) * request.PageSize)
                 .Take(request.PageSize)
                 .ToListAsync();
 
-            // Check if current user has liked comments
+            // Get current user ID if authenticated
             Guid? currentUserId = null;
             if (User.Identity?.IsAuthenticated == true)
             {
                 currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
             }
 
-            // Map to response
-            var commentResponses = comments.Select(c => new CommentDetailResponse
+            // Now load direct replies for these comments in a separate query
+            var commentIds = comments.Select(c => c.Id).ToList();
+            var directReplies = await _context.Comments
+                .Include(r => r.User)
+                .Include(r => r.Likes)
+                .Where(r => r.ParentCommentId != null && commentIds.Contains(r.ParentCommentId.Value))
+                .ToListAsync();
+
+            // Group replies by parent comment ID for easier mapping
+            var repliesByParent = directReplies.GroupBy(r => r.ParentCommentId.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Map to response using our helper method
+            var commentResponses = comments.Select(c =>
             {
-                Id = c.Id.ToString(),
-                User = new UserBriefResponse
+                var response = MapToCommentDetailResponse(c, currentUserId);
+
+                // Manually add first-level replies since we loaded them separately
+                if (repliesByParent.TryGetValue(c.Id, out var replies))
                 {
-                    Id = c.User.Id.ToString(),
-                    Username = c.User.Username,
-                    ProfilePictureUrl = c.User.ProfilePictureUrl
-                },
-                Text = c.Text,
-                CreatedAt = c.CreatedAt,
-                UpdatedAt = c.UpdatedAt,
-                LikesCount = c.Likes.Count,
-                RepliesCount = c.Replies.Count,
-                IsLikedByCurrentUser = currentUserId.HasValue && c.Likes.Any(l => l.UserId == currentUserId),
-                CanEdit = currentUserId.HasValue && c.UserId == currentUserId,
-                CanDelete = currentUserId.HasValue && c.UserId == currentUserId,
-                Replies = c.Replies.OrderByDescending(r => r.CreatedAt)
-                    .Select(r => new CommentResponse
-                    {
-                        Id = r.Id.ToString(),
-                        User = new UserBriefResponse
-                        {
-                            Id = r.User.Id.ToString(),
-                            Username = r.User.Username,
-                            ProfilePictureUrl = r.User.ProfilePictureUrl
-                        },
-                        Text = r.Text,
-                        CreatedAt = r.CreatedAt,
-                        UpdatedAt = r.UpdatedAt,
-                        LikesCount = r.Likes.Count,
-                        RepliesCount = r.Replies.Count,
-                        IsLiked = currentUserId.HasValue && r.Likes.Any(l => l.UserId == currentUserId), // Correctly set isLiked
-                        IsOwner = currentUserId.HasValue && r.UserId == currentUserId,
-                        // Include nested replies (up to 3 levels)
-                        Replies = r.Replies.OrderByDescending(r2 => r2.CreatedAt)
-                            .Select(r2 => new CommentResponse
-                            {
-                                Id = r2.Id.ToString(),
-                                User = new UserBriefResponse
-                                {
-                                    Id = r2.User.Id.ToString(),
-                                    Username = r2.User.Username,
-                                    ProfilePictureUrl = r2.User.ProfilePictureUrl
-                                },
-                                Text = r2.Text,
-                                CreatedAt = r2.CreatedAt,
-                                UpdatedAt = r2.UpdatedAt,
-                                LikesCount = r2.Likes.Count,
-                                RepliesCount = 0, // No deeper nesting
-                                IsLiked = currentUserId.HasValue && r2.Likes.Any(l => l.UserId == currentUserId),
-                                IsOwner = currentUserId.HasValue && r2.UserId == currentUserId,
-                                Replies = new List<CommentResponse>() // Empty list for deepest level
-                            }).ToList()
-                    }).ToList()
+                    response.Replies = replies
+                        .OrderByDescending(r => r.CreatedAt)
+                        .Select(r => MapToCommentResponse(r, currentUserId))
+                        .ToList();
+                }
+
+                return response;
             }).ToList();
 
             var response = new CommentPaginatedResponse
@@ -199,14 +160,10 @@ namespace Fragmento_server.Controllers
             if (request.PageSize < 1) request.PageSize = 10;
             if (request.PageSize > 50) request.PageSize = 50; // Maximum page size
 
-            // Get replies query with nested replies included
+            // Get replies query - direct replies to this comment
             var repliesQuery = _context.Comments
                 .Include(c => c.User)
                 .Include(c => c.Likes)
-                .Include(c => c.Replies) // Include nested replies
-                    .ThenInclude(r => r.User)
-                .Include(c => c.Replies) // Include likes on nested replies
-                    .ThenInclude(r => r.Likes)
                 .Where(c => c.ParentCommentId == commentId);
 
             // Apply sorting
@@ -224,57 +181,46 @@ namespace Fragmento_server.Controllers
             var totalReplies = await repliesQuery.CountAsync();
             var totalPages = (int)Math.Ceiling(totalReplies / (double)request.PageSize);
 
-            // Apply pagination
+            // Apply pagination and fetch the replies
             var replies = await repliesQuery
                 .Skip((request.Page - 1) * request.PageSize)
                 .Take(request.PageSize)
                 .ToListAsync();
 
-            // Check if current user has liked replies
+            // Get current user ID if authenticated
             Guid? currentUserId = null;
             if (User.Identity?.IsAuthenticated == true)
             {
                 currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
             }
 
-            // Map to response with proper nesting of replies
-            var replyResponses = replies.Select(r => new CommentDetailResponse
+            // Now load next-level replies for these comments
+            var replyIds = replies.Select(r => r.Id).ToList();
+            var nestedReplies = await _context.Comments
+                .Include(r => r.User)
+                .Include(r => r.Likes)
+                .Where(r => r.ParentCommentId != null && replyIds.Contains(r.ParentCommentId.Value))
+                .ToListAsync();
+
+            // Group nested replies by parent comment ID
+            var nestedRepliesByParent = nestedReplies.GroupBy(r => r.ParentCommentId.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Map replies to response format with proper nesting
+            var replyResponses = replies.Select(r =>
             {
-                Id = r.Id.ToString(),
-                User = new UserBriefResponse
+                var response = MapToCommentDetailResponse(r, currentUserId);
+
+                // Manually add next-level replies
+                if (nestedRepliesByParent.TryGetValue(r.Id, out var childReplies))
                 {
-                    Id = r.User.Id.ToString(),
-                    Username = r.User.Username,
-                    ProfilePictureUrl = r.User.ProfilePictureUrl
-                },
-                Text = r.Text,
-                CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt,
-                LikesCount = r.Likes.Count,
-                RepliesCount = r.Replies.Count,
-                IsLikedByCurrentUser = currentUserId.HasValue && r.Likes.Any(l => l.UserId == currentUserId),
-                CanEdit = currentUserId.HasValue && r.UserId == currentUserId,
-                CanDelete = currentUserId.HasValue && r.UserId == currentUserId,
-                // Include nested replies with proper properties
-                Replies = r.Replies.OrderByDescending(nr => nr.CreatedAt)
-                    .Select(nr => new CommentResponse
-                    {
-                        Id = nr.Id.ToString(),
-                        User = new UserBriefResponse
-                        {
-                            Id = nr.User.Id.ToString(),
-                            Username = nr.User.Username,
-                            ProfilePictureUrl = nr.User.ProfilePictureUrl
-                        },
-                        Text = nr.Text,
-                        CreatedAt = nr.CreatedAt,
-                        UpdatedAt = nr.UpdatedAt,
-                        LikesCount = nr.Likes.Count,
-                        RepliesCount = 0, // We don't support deeper nesting
-                        IsLiked = currentUserId.HasValue && nr.Likes.Any(l => l.UserId == currentUserId),
-                        IsOwner = currentUserId.HasValue && nr.UserId == currentUserId,
-                        Replies = new List<CommentResponse>() // Empty list for the deepest level
-                    }).ToList()
+                    response.Replies = childReplies
+                        .OrderByDescending(nr => nr.CreatedAt)
+                        .Select(nr => MapToCommentResponse(nr, currentUserId))
+                        .ToList();
+                }
+
+                return response;
             }).ToList();
 
             var response = new CommentPaginatedResponse
@@ -288,6 +234,65 @@ namespace Fragmento_server.Controllers
             };
 
             return Ok(response);
+        }
+
+        // Helper method to map comments to detail responses
+        private CommentDetailResponse MapToCommentDetailResponse(Comment comment, Guid? currentUserId)
+        {
+            if (comment == null) return null;
+
+            // Check if the current user has liked this comment
+            bool isLiked = currentUserId.HasValue && comment.Likes.Any(l => l.UserId == currentUserId.Value);
+
+            return new CommentDetailResponse
+            {
+                Id = comment.Id.ToString(),
+                User = new UserBriefResponse
+                {
+                    Id = comment.User.Id.ToString(),
+                    Username = comment.User.Username,
+                    ProfilePictureUrl = comment.User.ProfilePictureUrl
+                },
+                Text = comment.Text,
+                CreatedAt = comment.CreatedAt,
+                UpdatedAt = comment.UpdatedAt,
+                LikesCount = comment.Likes.Count,
+                RepliesCount = comment.Replies.Count,
+                IsLikedByCurrentUser = isLiked,
+                IsLiked = isLiked, // Set both properties to the same value
+                CanEdit = currentUserId.HasValue && comment.UserId == currentUserId.Value,
+                CanDelete = currentUserId.HasValue && comment.UserId == currentUserId.Value,
+                Replies = new List<CommentResponse>() // Initialize with empty list, will be filled separately
+            };
+        }
+
+        // Helper method to map comments to responses
+        private CommentResponse MapToCommentResponse(Comment comment, Guid? currentUserId)
+        {
+            if (comment == null) return null;
+
+            // Check if the current user has liked this comment
+            bool isLiked = currentUserId.HasValue && comment.Likes.Any(l => l.UserId == currentUserId.Value);
+
+            return new CommentResponse
+            {
+                Id = comment.Id.ToString(),
+                User = new UserBriefResponse
+                {
+                    Id = comment.User.Id.ToString(),
+                    Username = comment.User.Username,
+                    ProfilePictureUrl = comment.User.ProfilePictureUrl
+                },
+                Text = comment.Text,
+                CreatedAt = comment.CreatedAt,
+                UpdatedAt = comment.UpdatedAt,
+                LikesCount = comment.Likes.Count,
+                RepliesCount = comment.Replies.Count,
+                IsLiked = isLiked, // Set both properties
+                IsLikedByCurrentUser = isLiked, // Set both properties for consistency
+                IsOwner = currentUserId.HasValue && comment.UserId == currentUserId.Value,
+                Replies = new List<CommentResponse>() // Initialize with empty list
+            };
         }
 
         // POST: api/comments
@@ -411,10 +416,11 @@ namespace Fragmento_server.Controllers
                 CreatedAt = comment.CreatedAt,
                 LikesCount = 0,
                 RepliesCount = 0,
-                IsLikedByCurrentUser = false,
-                CanEdit = true,
-                CanDelete = true,
-                Replies = new List<CommentResponse>() // Initialize with empty list of CommentResponse
+                IsLikedByCurrentUser = false, // You can't like your own just-created comment
+                IsLiked = false, // Set both properties
+                CanEdit = true, // You can edit your own comment
+                CanDelete = true, // You can delete your own comment
+                Replies = new List<CommentResponse>() // Initialize with empty list
             };
 
             _logger.LogInformation($"Comment created successfully with ID: {comment.Id}");
@@ -491,7 +497,7 @@ namespace Fragmento_server.Controllers
                 .Where(c => c.ParentCommentId == id)
                 .ToListAsync();
 
-            // Update replies to be top-level comments
+            // Update replies to be top-level comments (parent removed)
             foreach (var reply in replies)
             {
                 reply.ParentCommentId = null;
@@ -510,14 +516,14 @@ namespace Fragmento_server.Controllers
                 .ToListAsync();
             _context.Notifications.RemoveRange(notifications);
 
-            // Remove the comment - MAKE SURE THIS EXECUTES
+            // Remove the comment
             _context.Comments.Remove(comment);
 
             // Save all changes
             var saveResult = await _context.SaveChangesAsync();
 
             _logger.LogInformation($"Comment {id} deleted successfully. SaveChanges result: {saveResult}");
-            return Ok(new { message= "Comment deleted successfully", affectedRecords= saveResult });
+            return Ok(new { message = "Comment deleted successfully", affectedRecords = saveResult });
         }
 
         // POST: api/comments/{id}/like
@@ -532,6 +538,7 @@ namespace Fragmento_server.Controllers
 
             var comment = await _context.Comments
                 .Include(c => c.Post)
+                .Include(c => c.Likes) // Important: Include likes to check if already liked
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (comment == null)
@@ -541,13 +548,12 @@ namespace Fragmento_server.Controllers
             }
 
             // Check if user already liked the comment
-            var existingLike = await _context.CommentLikes
-                .FirstOrDefaultAsync(cl => cl.CommentId == id && cl.UserId == currentUserId);
+            var existingLike = comment.Likes.FirstOrDefault(l => l.UserId == currentUserId);
 
             if (existingLike != null)
             {
                 _logger.LogWarning($"User {currentUserId} tried to like comment {id} but already liked it");
-                return Conflict(new { message = "You already liked this comment" });
+                return Conflict(new { message = "You already liked this comment", liked = true });
             }
 
             // Create like
@@ -597,14 +603,14 @@ namespace Fragmento_server.Controllers
 
             var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-            // Find the like
+            // Find the like directly
             var like = await _context.CommentLikes
                 .FirstOrDefaultAsync(cl => cl.CommentId == id && cl.UserId == currentUserId);
 
             if (like == null)
             {
                 _logger.LogWarning($"Like not found for comment {id} by user {currentUserId}");
-                return NotFound(new { message = "Like not found" });
+                return NotFound(new { message = "Like not found", liked = false });
             }
 
             _context.CommentLikes.Remove(like);

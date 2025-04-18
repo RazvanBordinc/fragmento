@@ -69,7 +69,7 @@ const handleResponse = async (response) => {
   const clonedResponse = response.clone();
   try {
     const textResponse = await clonedResponse.text();
-    console.log("API response text:", textResponse.substring(0, 200) + "...");
+    // console.log("API response text:", textResponse.substring(0, 200) + "...");
   } catch (e) {
     // Ignore error
   }
@@ -111,6 +111,16 @@ const mapApiCommentToFrontend = (apiComment, currentUser) => {
   const user = getProperty(apiComment, "user", {});
   const replies = getProperty(apiComment, "replies", []);
 
+  // Get like status from both possible property names for consistency
+  const isLiked = getProperty(apiComment, "isLiked", false);
+  const isLikedByCurrentUser = getProperty(
+    apiComment,
+    "isLikedByCurrentUser",
+    false
+  );
+  // Use either value that's true - handle the inconsistency in API response
+  const hasLiked = isLiked || isLikedByCurrentUser;
+
   return {
     id: getProperty(apiComment, "id", ""),
     userId: getProperty(user, "id", ""),
@@ -124,15 +134,13 @@ const mapApiCommentToFrontend = (apiComment, currentUser) => {
     updatedAt: getProperty(apiComment, "updatedAt", null),
     likesCount: getProperty(apiComment, "likesCount", 0),
     repliesCount: getProperty(apiComment, "repliesCount", 0),
-    isLiked: getProperty(apiComment, "isLikedByCurrentUser", false),
-    isLikedByCurrentUser: getProperty(
-      apiComment,
-      "isLikedByCurrentUser",
-      false
-    ),
+    // Set both properties to the same value for consistency
+    isLiked: hasLiked,
+    isLikedByCurrentUser: hasLiked,
     canEdit: getProperty(apiComment, "canEdit", false),
     canDelete: getProperty(apiComment, "canDelete", false),
     parentCommentId: getProperty(apiComment, "parentCommentId", null),
+    // Recursively map nested replies
     replies: Array.isArray(replies)
       ? replies.map((reply) => mapApiCommentToFrontend(reply, currentUser))
       : [],
@@ -331,6 +339,12 @@ export const CommentsApi = {
 
       console.log(`Like comment response status: ${response.status}`);
 
+      // If the response indicates the comment is already liked, handle it gracefully
+      if (response.status === 409) {
+        console.log("Comment already liked");
+        return { liked: true };
+      }
+
       return handleResponse(response);
     } catch (error) {
       console.error("Error liking comment:", error);
@@ -349,6 +363,12 @@ export const CommentsApi = {
       );
 
       console.log(`Unlike comment response status: ${response.status}`);
+
+      // If the response indicates the comment wasn't liked, handle it gracefully
+      if (response.status === 404) {
+        console.log("Comment not liked previously");
+        return { liked: false };
+      }
 
       return handleResponse(response);
     } catch (error) {

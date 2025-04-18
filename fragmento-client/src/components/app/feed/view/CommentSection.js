@@ -35,6 +35,7 @@ export default function CommentsSection({
   // Action states
   const [submittingComment, setSubmittingComment] = useState(false);
   const [pendingActionId, setPendingActionId] = useState(null);
+  const [processingLikeIds, setProcessingLikeIds] = useState(new Set());
 
   // Modal states
   const [modal, setModal] = useState({
@@ -77,6 +78,9 @@ export default function CommentsSection({
   const normalizeComments = (commentsArray) => {
     if (!Array.isArray(commentsArray)) return [];
 
+    // Debug information
+    console.log(`Normalizing ${commentsArray.length} comments`);
+
     return commentsArray.map((comment) => {
       // Ensure each comment has all required properties with fallbacks
       const normalizedComment = {
@@ -87,8 +91,10 @@ export default function CommentsSection({
         updatedAt: comment.updatedAt || null,
         likesCount: comment.likesCount || comment.likes || 0,
         repliesCount: comment.repliesCount || 0,
+        // Use either property for like status
         isLiked: comment.isLiked || comment.isLikedByCurrentUser || false,
-        isLikedByCurrentUser: comment.isLikedByCurrentUser || false,
+        isLikedByCurrentUser:
+          comment.isLikedByCurrentUser || comment.isLiked || false,
         canEdit:
           comment.canEdit ||
           comment.userId === currentUser?.id ||
@@ -177,6 +183,8 @@ export default function CommentsSection({
     setError(null);
 
     try {
+      console.log(`Fetching comments for post ${postId}, page ${page}`);
+
       const response = await CommentsApi.getComments(postId, {
         page,
         pageSize: 10,
@@ -184,6 +192,8 @@ export default function CommentsSection({
         descending: true,
         onlyTopLevel: true,
       });
+
+      console.log("Comments API response:", response);
 
       // Handle both camelCase and PascalCase property names in the response
       const commentsData = response.comments || response.Comments || [];
@@ -265,7 +275,10 @@ export default function CommentsSection({
         parentCommentId: replyingTo || null,
       };
 
+      console.log("Submitting new comment:", commentData);
+
       const response = await CommentsApi.createComment(commentData);
+      console.log("Create comment response:", response);
 
       // Map the new comment to frontend format
       const newCommentFormatted = CommentsApi.mapApiCommentToFrontend(
@@ -354,14 +367,26 @@ export default function CommentsSection({
       return;
     }
 
-    if (pendingActionId === commentId) return;
-    setPendingActionId(commentId);
+    // Prevent duplicate likes while processing
+    if (processingLikeIds.has(commentId)) {
+      console.log(`Already processing like for comment ${commentId}`);
+      return;
+    }
+
+    // Add this comment ID to the processing set
+    setProcessingLikeIds((prev) => new Set([...prev, commentId]));
 
     try {
       // Find comment in state to check if it's already liked
       const isLiked =
         findCommentProperty(comments, commentId, "isLiked") ||
         findCommentProperty(comments, commentId, "isLikedByCurrentUser");
+
+      console.log(
+        `Liking comment ${commentId}, current state: ${
+          isLiked ? "liked" : "not liked"
+        }`
+      );
 
       // Optimistic update
       setComments((prevComments) =>
@@ -381,6 +406,10 @@ export default function CommentsSection({
       } else {
         await CommentsApi.likeComment(commentId);
       }
+
+      console.log(
+        `Successfully ${isLiked ? "unliked" : "liked"} comment ${commentId}`
+      );
     } catch (error) {
       console.error("Error liking/unliking comment:", error);
 
@@ -401,7 +430,12 @@ export default function CommentsSection({
         "Failed to like comment: " + (error.message || "Unknown error")
       );
     } finally {
-      setPendingActionId(null);
+      // Remove this comment ID from the processing set
+      setProcessingLikeIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(commentId);
+        return newSet;
+      });
     }
   };
 
@@ -607,12 +641,16 @@ export default function CommentsSection({
     setPendingActionId(commentId);
 
     try {
+      console.log(`Loading replies for comment ${commentId}`);
+
       const response = await CommentsApi.getReplies(commentId, {
         page: 1,
         pageSize: 20, // Get a good number of replies
         sortBy: "createdAt",
         descending: true,
       });
+
+      console.log(`Replies response for comment ${commentId}:`, response);
 
       // Handle both camelCase and PascalCase property names
       const repliesData = response.comments || response.Comments || [];
@@ -622,6 +660,10 @@ export default function CommentsSection({
         repliesData.map((reply) =>
           CommentsApi.mapApiCommentToFrontend(reply, currentUser)
         )
+      );
+
+      console.log(
+        `Mapped ${mappedReplies.length} replies for comment ${commentId}`
       );
 
       // Update comments state to include all replies
@@ -773,7 +815,10 @@ export default function CommentsSection({
                       onReply={handleReplyToComment}
                       onLoadReplies={handleLoadReplies}
                       formatTimestamp={formatTimestamp}
-                      isProcessing={pendingActionId === comment.id}
+                      isProcessing={
+                        pendingActionId === comment.id ||
+                        processingLikeIds.has(comment.id)
+                      }
                       hasLoadedAllReplies={loadedReplies[comment.id] || false}
                     />
                   ))}

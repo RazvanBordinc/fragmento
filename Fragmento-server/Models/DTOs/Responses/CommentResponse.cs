@@ -11,6 +11,8 @@ public class CommentResponse
         public int RepliesCount { get; set; }
         public bool IsLiked { get; set; }
         public bool IsOwner { get; set; }
+        public bool IsLikedByCurrentUser { get; set; }
         public List<CommentResponse> Replies { get; set; }
+
     }
 }
