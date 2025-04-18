@@ -1,7 +1,7 @@
 /** @format */
 "use client";
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 import {
   Heart,
@@ -33,15 +33,9 @@ import DayNightIndicator from "./DayNightIndicator";
 import CommentsSection from "./CommentSection";
 import PhotoModal from "./PhotoModal";
 
-// Enhanced detection functions for "Not specified" values
-
 // Helper function to check if ratings were explicitly set by user
 const wasRatingSpecified = (ratings) => {
   if (!ratings) return false;
-
-  // For version 1 of your app, let's consider:
-  // 1. If all ratings have exactly the same value, they might be default unmodified values
-  // 2. If ratings object doesn't have expected keys or they're all 0, they're unspecified
 
   // Get detailed ratings (excluding overall)
   const detailedRatings = Object.entries(ratings).filter(
@@ -192,10 +186,12 @@ export default function FragrancePost({
   currentUser,
   onPostDelete,
   onPostEdit,
+  onPostLike,
+  onPostSave,
 }) {
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [likeCount, setLikeCount] = useState(post.fragrance.likes);
+  const [liked, setLiked] = useState(post.isLiked || false);
+  const [saved, setSaved] = useState(post.isSaved || false);
+  const [likeCount, setLikeCount] = useState(post.likesCount || 0);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
   const [showFullDescription, setShowFullDescription] = useState(false);
@@ -218,13 +214,52 @@ export default function FragrancePost({
     relaxing: { emoji: "🏠", label: "Relaxing at Home" },
   };
 
-  const handleLike = () => {
-    if (liked) {
-      setLikeCount(likeCount - 1);
-    } else {
-      setLikeCount(likeCount + 1);
+  const handleLike = async () => {
+    if (!currentUser || currentUser.id === "guest") {
+      alert("Please log in to like posts");
+      return;
     }
-    setLiked(!liked);
+
+    // Optimistic update
+    const newLikedState = !liked;
+    const newLikeCount = newLikedState ? likeCount + 1 : likeCount - 1;
+
+    setLiked(newLikedState);
+    setLikeCount(newLikeCount);
+
+    try {
+      // Call the parent component's handler
+      if (onPostLike) {
+        await onPostLike(post.id, liked);
+      }
+    } catch (error) {
+      // Revert on error
+      setLiked(liked);
+      setLikeCount(likeCount);
+      console.error("Error liking post:", error);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!currentUser || currentUser.id === "guest") {
+      alert("Please log in to save posts");
+      return;
+    }
+
+    // Optimistic update
+    const newSavedState = !saved;
+    setSaved(newSavedState);
+
+    try {
+      // Call the parent component's handler
+      if (onPostSave) {
+        await onPostSave(post.id, saved);
+      }
+    } catch (error) {
+      // Revert on error
+      setSaved(saved);
+      console.error("Error saving post:", error);
+    }
   };
 
   // Function to truncate text with "Show more" option
@@ -240,12 +275,9 @@ export default function FragrancePost({
     setLoadingAction("Deleting post...");
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
       // Call the parent component's handler if provided
       if (onPostDelete) {
-        onPostDelete(postId);
+        await onPostDelete(postId);
       }
     } catch (error) {
       console.error("Error deleting post:", error);
@@ -296,7 +328,7 @@ export default function FragrancePost({
       <PhotoModal
         isOpen={isPhotoModalOpen}
         onClose={() => setIsPhotoModalOpen(false)}
-        photoUrl={post.fragrance.photo}
+        photoUrl={post.fragrance.photoUrl || post.fragrance.photo}
         fragranceName={`${post.fragrance.brand} ${post.fragrance.name}`}
       />
 
@@ -304,9 +336,9 @@ export default function FragrancePost({
       <div className="p-3 flex items-center justify-between border-b border-zinc-700/60">
         <div className="flex items-center">
           <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-zinc-800 font-bold overflow-hidden">
-            {post.user.profilePic ? (
+            {post.user.profilePictureUrl ? (
               <img
-                src={post.user.profilePic}
+                src={post.user.profilePictureUrl}
                 alt={post.user.username}
                 className="w-full h-full rounded-full object-cover"
               />
@@ -318,7 +350,9 @@ export default function FragrancePost({
             <div className="text-white font-medium text-sm">
               {post.user.username}
             </div>
-            <div className="text-zinc-500 text-xs">{post.timestamp}</div>
+            <div className="text-zinc-500 text-xs">
+              {new Date(post.createdAt).toLocaleString()}
+            </div>
           </div>
         </div>{" "}
         <PostMenu
@@ -345,7 +379,7 @@ export default function FragrancePost({
           </div>
 
           <div className="flex items-center">
-            <RatingStars value={post.fragrance.ratings.overall} />
+            <RatingStars value={post.fragrance.ratings?.overall || 0} />
           </div>
         </div>
 
@@ -383,14 +417,14 @@ export default function FragrancePost({
         )}
 
         {/* Single Photo Display - with click to expand */}
-        {post.fragrance.photo && (
+        {(post.fragrance.photoUrl || post.fragrance.photo) && (
           <div className="mt-4 relative">
             <div
               className="w-full rounded-lg overflow-hidden cursor-pointer relative group"
               onClick={openPhotoModal}
             >
               <img
-                src={post.fragrance.photo}
+                src={post.fragrance.photoUrl || post.fragrance.photo}
                 alt={post.fragrance.name}
                 className="w-full h-auto max-h-96 object-contain bg-zinc-900/30 rounded-lg border border-zinc-700/50"
               />
@@ -451,7 +485,7 @@ export default function FragrancePost({
               <MessageCircle className="h-5 w-5" />
             </motion.div>
             <span className="ml-1 text-xs">
-              {post.comments ? post.comments.length : 0}
+              {post.commentsCount || (post.comments ? post.comments.length : 0)}
             </span>
           </button>
 
@@ -469,7 +503,7 @@ export default function FragrancePost({
           className={`cursor-pointer ${
             saved ? "text-yellow-500" : "text-zinc-400 hover:text-zinc-300"
           }`}
-          onClick={() => setSaved(!saved)}
+          onClick={handleSave}
         >
           <motion.div
             whileTap={{ scale: 1.2 }}
@@ -616,13 +650,7 @@ export default function FragrancePost({
       <CommentsSection
         postId={post.id}
         initialComments={post.comments || []}
-        currentUser={
-          currentUser || {
-            id: "current-user",
-            username: "You",
-            profilePic: null,
-          }
-        }
+        currentUser={currentUser}
       />
     </div>
   );

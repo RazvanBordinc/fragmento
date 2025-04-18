@@ -4,9 +4,25 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Heart, Trash2, Reply } from "lucide-react";
 import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
 
 const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
-  const isOwnComment = comment.userId === currentUser.id;
+  // Check if current user is the owner of the comment
+  const isOwnComment = comment.userId === currentUser.id || comment.canEdit;
+
+  // Format the timestamp
+  const formatTimestamp = (timestamp) => {
+    // If it's a date string from the API, format it nicely
+    if (typeof timestamp === "string" && timestamp.includes("T")) {
+      try {
+        return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+      } catch (e) {
+        return timestamp;
+      }
+    }
+    // Otherwise, use the provided string (like "Just now")
+    return timestamp;
+  };
 
   return (
     <motion.div
@@ -16,16 +32,19 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
       layout
       className="flex items-start gap-2"
     >
-      <Link href={`/app/${comment.username}`} className="cursor-pointer">
+      <Link
+        href={`/app/${comment.user?.username || comment.username}`}
+        className="cursor-pointer"
+      >
         <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center text-zinc-800 font-bold overflow-hidden flex-shrink-0">
-          {comment.profilePic ? (
+          {comment.user?.profilePictureUrl || comment.profilePic ? (
             <img
-              src={comment.profilePic}
-              alt={comment.username}
+              src={comment.user?.profilePictureUrl || comment.profilePic}
+              alt={comment.user?.username || comment.username}
               className="w-full h-full object-cover"
             />
           ) : (
-            comment.username.charAt(0).toUpperCase()
+            (comment.user?.username || comment.username).charAt(0).toUpperCase()
           )}
         </div>
       </Link>
@@ -37,12 +56,17 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
           transition={{ duration: 0.2 }}
         >
           <div className="flex justify-between items-start">
-            <Link href={`/app/${comment.username}`} className="cursor-pointer">
+            <Link
+              href={`/app/${comment.user?.username || comment.username}`}
+              className="cursor-pointer"
+            >
               <div className="text-white text-xs font-medium hover:text-orange-400 transition-colors">
-                {comment.username}
+                {comment.user?.username || comment.username}
               </div>
             </Link>
-            <div className="text-zinc-500 text-xs">{comment.timestamp}</div>
+            <div className="text-zinc-500 text-xs">
+              {formatTimestamp(comment.createdAt || comment.timestamp)}
+            </div>
           </div>
           <div className="text-zinc-300 text-sm mt-1">{comment.text}</div>
         </motion.div>
@@ -50,7 +74,7 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
         <div className="flex items-center mt-1 text-xs space-x-3">
           <button
             className={`flex items-center cursor-pointer ${
-              comment.isLiked
+              comment.isLiked || comment.isLikedByCurrentUser
                 ? "text-red-500"
                 : "text-zinc-500 hover:text-zinc-400"
             }`}
@@ -62,15 +86,21 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
             >
               <Heart
                 size={12}
-                fill={comment.isLiked ? "currentColor" : "none"}
+                fill={
+                  comment.isLiked || comment.isLikedByCurrentUser
+                    ? "currentColor"
+                    : "none"
+                }
               />
             </motion.div>
-            <span className="ml-1">{comment.likes}</span>
+            <span className="ml-1">{comment.likesCount}</span>
           </button>
 
           <button
             className="flex items-center text-zinc-500 hover:text-zinc-400 cursor-pointer"
-            onClick={() => onReply(comment.id, comment.username)}
+            onClick={() =>
+              onReply(comment.id, comment.user?.username || comment.username)
+            }
           >
             <motion.div
               whileTap={{ scale: 1.3 }}
@@ -81,7 +111,7 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
             <span className="ml-1">Reply</span>
           </button>
 
-          {isOwnComment && (
+          {(isOwnComment || comment.canDelete) && (
             <button
               className="flex items-center text-zinc-500 hover:text-red-400 cursor-pointer"
               onClick={() => onDelete(comment.id)}
@@ -117,5 +147,4 @@ const Comment = ({ comment, currentUser, onLike, onDelete, onReply }) => {
   );
 };
 
-// Export as default to avoid circular dependency issues with recursion
 export default Comment;

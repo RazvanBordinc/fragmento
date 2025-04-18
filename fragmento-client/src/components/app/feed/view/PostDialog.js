@@ -4,13 +4,20 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2 } from "lucide-react";
 import PostForm from "../post/PostForm";
+import { PostsApi } from "@/lib/posts/PostsApi";
+import {
+  mapComponentPostToApiPost,
+  mapApiPostToComponentPost,
+} from "@/lib/utils/data-mappers";
 
 export default function PostDialog({ isOpen, onClose, onPostCreated }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleClose = () => {
     if (!isSubmitting) {
       onClose();
+      setError(null);
     }
   };
 
@@ -18,63 +25,52 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
     if (isSubmitting) return;
 
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      // Simulate API call with a delay
-      // In a real app, you would replace this with an actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Convert form data to API format using our mapper
+      const postData = mapComponentPostToApiPost(formData);
 
-      // Create the photo URL if photo exists
+      // For clarity, log the data we're about to send
+      console.log("Submitting post data:", postData);
+
+      // For simplicity, we're not handling photo uploads completely
+      // In a real app, you would upload the photo to a server/cloud storage
+      // and then include the URL in the post data
+
       let photoUrl = null;
-      if (formData.photos.length > 0) {
-        photoUrl = URL.createObjectURL(formData.photos[0]);
+      if (formData.photos && formData.photos.length > 0) {
+        // This would normally be replaced with actual file upload code
+        // For now, we'll just use a placeholder URL if there's a photo
+        photoUrl = "https://via.placeholder.com/400x400";
+
+        // In a real implementation, you might do something like:
+        // const formDataForUpload = new FormData();
+        // formDataForUpload.append('file', formData.photos[0]);
+        // const uploadResponse = await fetch('/api/upload', { method: 'POST', body: formDataForUpload });
+        // const uploadResult = await uploadResponse.json();
+        // photoUrl = uploadResult.url;
       }
 
-      // Create a new post object from the form data
-      const newPost = {
-        id: `post-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        user: {
-          id: "current-user-123", // This would come from your auth system
-          username: "fragrancefan", // This would come from your auth system
-          profilePic: null,
-        },
-        timestamp: "Just now",
-        fragrance: {
-          id: `frag-${Date.now()}`,
-          name: formData.name,
-          brand: formData.brand,
-          category: formData.category,
-          description: formData.description,
-          likes: 0,
-          occasion: formData.occasion,
-          // Include photo only if one exists
-          photo: photoUrl,
-          tags: formData.tags,
-          notes: formData.notes,
-          accords: formData.accords,
-          ratings: {
-            overall: formData.ratings.overall || 5,
-            longevity: formData.ratings.longevity || 5,
-            sillage: formData.ratings.sillage || 5,
-            scent: formData.ratings.scent || 5,
-            value: formData.ratings.valueForMoney || 5,
-          },
-          seasons: {
-            spring: formData.seasons.spring || 3,
-            summer: formData.seasons.summer || 3,
-            fall: formData.seasons.autumn || 3,
-            winter: formData.seasons.winter || 3,
-          },
-          dayNight: formData.dayNight * 10, // Convert to 0-100 scale
-        },
-        comments: [],
-      };
+      // Add the photo URL to the post data
+      postData.photoUrl = photoUrl;
 
-      // Call the onPostCreated callback with the new post
-      onPostCreated(newPost);
+      // Send to API
+      const response = await PostsApi.createPost(postData);
+
+      // Map API response back to component format
+      const mappedResponse = mapApiPostToComponentPost(response);
+
+      // Call the parent component's callback with the new post
+      if (onPostCreated) {
+        onPostCreated(mappedResponse);
+      }
+
+      // Close the dialog
+      handleClose();
     } catch (error) {
       console.error("Error creating post:", error);
-      // Here you would handle errors, maybe show a notification
+      setError(error.message || "Failed to create post. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -128,6 +124,13 @@ export default function PostDialog({ isOpen, onClose, onPostCreated }) {
                 <X size={20} />
               </button>
             </div>
+
+            {/* Error message */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 m-4 p-3 rounded-md">
+                <p className="text-red-500 text-sm">{error}</p>
+              </div>
+            )}
 
             {/* Overlay while submitting */}
             <AnimatePresence>
