@@ -270,7 +270,7 @@ export default function AuthForm() {
             password: formData.password,
             confirmPassowrd: formData.confirmPassword,
           }),
-          credentials: "include", // Important: include credentials for cookies
+          credentials: "include",
         });
 
         // First check if the response is OK

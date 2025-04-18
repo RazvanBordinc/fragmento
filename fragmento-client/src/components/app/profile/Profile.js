@@ -20,8 +20,10 @@ import ToastNotification from "../feed/view/ToastNotification";
 import LoadingOverlay from "../feed/post/LoadingOverlay";
 import ProfileEditModal from "./ProfileEditModal";
 import SignatureFragrance from "./SignatureFragrance";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 export default function ProfilePage() {
+  const { user, logout } = useAuth();
   // User data - added signatureFragrance field
   const [userData, setUserData] = useState({
     id: "current-user-123",
@@ -235,22 +237,10 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     setIsLoading(true);
-    setLoadingMessage("Logging out...");
-    setIsSettingsOpen(false);
-
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // In a real app, would redirect to login page or home
-      setToast({
-        visible: true,
-        message: "Logged out successfully",
-        type: "success",
-      });
+      await logout();
     } catch (error) {
-      console.error("Error logging out:", error);
-    } finally {
+      console.error("Logout error:", error);
       setIsLoading(false);
     }
   };

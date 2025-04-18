@@ -100,10 +100,7 @@ export default function AccountSettings() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Use the enhanced logout from AuthContext
-      // This handles calling the API, clearing cookies, and redirecting
       await logout();
-      // No need to redirect, the logout function handles that
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoggingOut(false);

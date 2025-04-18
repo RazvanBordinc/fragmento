@@ -35,7 +35,7 @@ export const registerUser = async (userData) => {
         email: userData.email,
         username: userData.username,
         password: userData.password,
-        confirmPassword: formData.confirmPassword,
+        confirmPassword: userData.confirmPassword,
       }),
       credentials: "include",
     });
@@ -44,9 +44,11 @@ export const registerUser = async (userData) => {
     const data = normalizeCasing(rawData);
 
     if (!response.ok) {
-      const formattedErrors = Object.values(data.errors).flat();
+      const formattedErrors = data.message
+        ? data.message
+        : Object.values(data.errors).flat();
 
-      const errorMessage = formattedErrors || 1 || "Registration failed";
+      const errorMessage = formattedErrors || "Registration failed";
       throw new Error(errorMessage);
     }
 
@@ -78,7 +80,10 @@ export const loginUser = async (credentials) => {
       const data = normalizeCasing(rawData);
 
       if (!response.ok) {
-        const errorMessage = data.message || rawData.Message || "Login failed";
+        const formattedErrors = data.message
+          ? data.message
+          : Object.values(data.errors).flat();
+        const errorMessage = formattedErrors || "Login failed";
         throw new Error(errorMessage);
       }
 
