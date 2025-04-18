@@ -86,7 +86,7 @@ export async function loginUserAction(formData) {
       },
     };
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Login erro1r:", error);
     return { success: false, error: "Login service unavailable" };
   }
 }

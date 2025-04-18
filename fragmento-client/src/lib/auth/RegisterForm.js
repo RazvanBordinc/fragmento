@@ -121,13 +121,6 @@ export default function RegisterForm() {
       const username = getProperty(response, "username");
       const email = getProperty(response, "email");
 
-      // Check if we have a valid token
-      if (!token) {
-        throw new Error(
-          "Invalid response from server. Missing authentication token."
-        );
-      }
-
       // Store in cookies for middleware
       try {
         const expires = new Date();
